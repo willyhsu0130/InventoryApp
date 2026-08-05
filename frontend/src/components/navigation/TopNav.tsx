@@ -19,7 +19,7 @@ export const TopNav = ({ className = "", setNavbarIsOpen }: TopNavProps) => {
                 </button>
 
                 <p className="text-2xl font-semibold text-slate-100">
-                    晁欣漁產庫存管理
+                    晁欣漁產庫存管理系統
                 </p>
             </div>
         </div>

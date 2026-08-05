@@ -1,42 +1,46 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { katanaFetch } from "../lib/katanaFetch";
-import { ProductContext, type KatanaProduct, type KatanaVariant, type ResolvedVariantInfo } from "./ProductContext";
+import { ProductContext, type ResolvedVariantInfo } from "./ProductContext";
+
+import { convertProductToPayload, convertVariantToPayload, type KatanaProduct, type KatanaVariant } from "../models/katana";
 import { KATANA_API_ROUTES } from "../lib/routes/routes";
+import { useError } from "../hooks/useError";
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [variants, setVariants] = useState<Map<number, KatanaVariant>>(new Map());
     const [products, setProducts] = useState<Map<number, KatanaProduct>>(new Map());
     const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const { setErrorMessage } = useError()
 
     // Shared refetch handler for manual triggers
     const refetchProducts = useCallback(async () => {
         setLoading(true);
-        setError(null);
-
+        // Get the variants obj and products obj
         const [variantsRes, productsRes] = await Promise.all([
             katanaFetch<KatanaVariant[]>(KATANA_API_ROUTES.VARIANTS),
             katanaFetch<KatanaProduct[]>(KATANA_API_ROUTES.PRODUCTS),
         ]);
-
+        // Check if both variants and products are valid 
         if (variantsRes.success && Array.isArray(variantsRes.data)) {
+            // Put all variants into a map
             const vMap = new Map<number, KatanaVariant>();
             variantsRes.data.forEach((v) => vMap.set(v.id, v));
             setVariants(vMap);
         }
 
         if (productsRes.success && Array.isArray(productsRes.data)) {
+            // Put all products into a map
             const pMap = new Map<number, KatanaProduct>();
             productsRes.data.forEach((p) => pMap.set(p.id, p));
             setProducts(pMap);
         }
-
+        // If Error
         if (!variantsRes.success || !productsRes.success) {
-            setError("Failed to sync product metadata.");
+            setErrorMessage("Failed to sync product metadata.");
         }
 
         setLoading(false);
-    }, []);
+    }, [setErrorMessage]);
 
     // Initial mount sync using unmount flag safety
     useEffect(() => {
@@ -51,19 +55,21 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (!isMounted) return;
 
             if (variantsRes.success && Array.isArray(variantsRes.data)) {
+                // Turn katana variant into a map
                 const vMap = new Map<number, KatanaVariant>();
                 variantsRes.data.forEach((v) => vMap.set(v.id, v));
                 setVariants(vMap);
             }
 
             if (productsRes.success && Array.isArray(productsRes.data)) {
+                // Turn katana product into a map
                 const pMap = new Map<number, KatanaProduct>();
                 productsRes.data.forEach((p) => pMap.set(p.id, p));
                 setProducts(pMap);
             }
-
+            // Error hadnling =
             if (!variantsRes.success || !productsRes.success) {
-                setError("Failed to sync product metadata.");
+                setErrorMessage("Failed to sync product metadata.");
             }
 
             setLoading(false);
@@ -74,35 +80,91 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [setErrorMessage]);
 
+    // Get variant details helper function
     const getVariantDetails = useMemo(() => {
         return (variant_id: number): ResolvedVariantInfo => {
+            // get the variant object according to its id using the map
             const variant = variants.get(variant_id);
+
+            // find the product matching the variant
             const product = variant?.product_id ? products.get(variant.product_id) : null;
 
+            // find the product details
             const variant_details = variant?.config_attributes?.length
                 ? variant.config_attributes.map((a) => a.config_value).join(" / ")
                 : null;
 
             return {
+                productId: product?.id || 0,
                 product_name: product?.name ?? `Variant #${variant_id}`,
                 variant_details,
                 sku: variant?.sku ?? "N/A",
                 uom: product?.uom ?? "pcs",
-                category_name: product?.category_name ?? "Uncategorized",
+                category_name: product?.name ?? "Uncategorized",
             };
         };
     }, [variants, products]);
+
+    const editProduct = useCallback(async (updatedProduct: KatanaProduct) => {
+        // 1. Convert KatanaProduct to KatanaUpdateProductPayload by extracting only writable fields
+        const payload = convertProductToPayload(updatedProduct);
+
+        // 2. Call the PATCH /products/{id} endpoint
+        const endpoint = KATANA_API_ROUTES.PRODUCT_BY_ID(updatedProduct.id);
+        console.log(payload)
+        const res = await katanaFetch<KatanaProduct>(endpoint, {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.success) {
+            setErrorMessage(res.message || "Update failed");
+            throw new Error(res.message); // Rethrow so modal UI knows save failed
+        }
+    }, [setErrorMessage]);
+
+
+    const editVariant = useCallback(async (updatedVariant: KatanaVariant): Promise<KatanaVariant> => {
+        // 1. Convert KatanaVariant to KatanaUpdateVariantPayload (writable/sanitized fields)
+        const payload = convertVariantToPayload(updatedVariant);
+
+        // 2. Call the PATCH /variants/{id} endpoint
+        const endpoint = KATANA_API_ROUTES.VARIANT_BY_ID(updatedVariant.id);
+        console.log("Syncing variant patch payload:", payload);
+
+        const res = await katanaFetch<KatanaVariant>(endpoint, {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.success) {
+            const errorMsg = res.message || "Failed to update variant";
+            setErrorMessage(errorMsg);
+            throw new Error(errorMsg); // Rethrow so component UI can retain edit/loading state
+        }
+
+        const savedVariant = res.data;
+        if (!savedVariant) {
+            setErrorMessage("Error with saved")
+        }
+        // 3. Update parent product in local state/cache Map (if storing nested variants inside products)
+
+        return savedVariant;
+    }, [setErrorMessage]);
+
 
     return (
         <ProductContext.Provider
             value={{
                 variants,
                 loading,
-                error,
                 getVariantDetails,
                 refetchProducts,
+                editProduct,
+                editVariant,
+                products
             }}
         >
             {children}

@@ -8,22 +8,26 @@ import { Production } from "./pages/Production"
 import { Settings } from "./pages/Settings"
 import { Products } from "./pages/Products"
 import { ProductProvider } from "./context/ProductProvider"
+import { InventoryProvider } from "./context/InventoryProvider"
+import { ErrorProvider } from "./context/ErrorProvider"
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Parent Route using MainLayout */}
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/inventory" element={<ProductProvider><Inventory /></ProductProvider>} />
-          <Route path="/production" element={<Production />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/products" element={<ProductProvider><Products /></ProductProvider>} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <ErrorProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Parent Route using MainLayout */}
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/inventory" element={<ProductProvider><Inventory /></ProductProvider>} />
+            <Route path="/production" element={<Production />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/products" element={<InventoryProvider><ProductProvider><Products /></ProductProvider></InventoryProvider>} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ErrorProvider>
   )
 }

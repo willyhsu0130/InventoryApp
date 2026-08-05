@@ -37,7 +37,7 @@ export const navbarItems: NavbarItem[] = [
   {
     icon: Factory,
     link: "/products",
-    text: "商品",
+    text: "產品",
   },
   {
     icon: Settings,

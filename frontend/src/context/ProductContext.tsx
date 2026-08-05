@@ -1,22 +1,8 @@
 import { createContext } from "react";
-export interface KatanaVariant {
-    id: number;
-    product_id: number | null;
-    material_id: number | null;
-    sku: string | null;
-    type: "product" | "material";
-    config_attributes?: { config_name: string; config_value: string }[];
-}
-
-export interface KatanaProduct {
-    id: number;
-    name: string;
-    uom: string;
-    category_name?: string;
-    type: string;
-}
+import type { KatanaProduct, KatanaVariant } from "../models/katana";
 
 export interface ResolvedVariantInfo {
+    productId: number
     product_name: string;
     variant_details: string | null;
     sku: string;
@@ -25,13 +11,13 @@ export interface ResolvedVariantInfo {
 }
 
 interface ProductContextType {
+    products: Map<number, KatanaProduct>;
     variants: Map<number, KatanaVariant>; // <-- Add this
     loading: boolean;
-    error: string | null;
     getVariantDetails: (variant_id: number) => ResolvedVariantInfo;
     refetchProducts: () => Promise<void>;
+    editProduct: (updatedProduct: KatanaProduct) => Promise<void>
+    editVariant: (updatedProduct: KatanaVariant) => Promise<KatanaVariant>
 }
 
 export const ProductContext = createContext<ProductContextType | undefined>(undefined);
-
-
