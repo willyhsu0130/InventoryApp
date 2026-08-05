@@ -2,77 +2,91 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Load environment variables from .env file
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const KATANA_BASE_URL = 'https://api.katanamrp.com/v1';
 
-// Completely open CORS for testing
-app.use(cors());
+// Middleware to parse incoming JSON bodies for POST/PUT/PATCH requests
+app.use(express.json());
 
-// Helper function to fetch from Katana securely
-async function fetchFromKatana(endpoint: string, options: RequestInit = {}) {
+app.use(cors({
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+}));
+
+// Dynamic proxy function handling all HTTP methods & body payloads
+async function forwardToKatana(req: Request, targetPath: string) {
     const apiKey = process.env.KATANA_KEY;
 
-    console.log(apiKey)
     if (!apiKey) {
         throw new Error('KATANA_KEY is missing in server environment variables.');
     }
 
-    const response = await fetch(`${KATANA_BASE_URL}${endpoint}`, {
-        ...options,
+    // Preserve query parameters (e.g., /api/sales_orders?limit=10)
+    const queryString = Object.keys(req.query).length
+        ? `?${new URLSearchParams(req.query as Record<string, string>).toString()}`
+        : '';
+
+    const url = `${KATANA_BASE_URL}${targetPath}${queryString}`;
+
+    console.log(`[${req.method}] Proxying to Katana: ${url}`);
+
+    const options: RequestInit = {
+        method: req.method,
         headers: {
             'Authorization': `Bearer ${apiKey.trim()}`,
-
-            // 2. Exact headers expected by Katana / Cloudflare
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-
-            // 3. User-Agent string resembling a browser or standard client
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            ...options.headers,
         },
-    });
-    console.log(response)
+    };
+
+    // Attach request body for state-changing methods (POST, PUT, PATCH)
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && Object.keys(req.body).length > 0) {
+        options.body = typeof req.body === 'string'
+            ? req.body
+            : JSON.stringify(req.body);
+    }
+    console.log(options)
+    const response = await fetch(url, options);
+
     if (!response.ok) {
-        console.log("Response not ok")
         const errorText = await response.text();
-        throw new Error(`Katana API Error (${response.status}): ${errorText}`);
+        throw { status: response.status, message: errorText };
+    }
+
+    // Handle 204 No Content responses safely
+    if (response.status === 204) {
+        return {};
     }
 
     return response.json();
 }
 
-// 📦 Test endpoint for Inventory
-app.get('/api/inventory', async (req: Request, res: Response) => {
+// 🔄 Catch-all wildcard endpoint for all `/api/*` routes and HTTP verbs
+app.all('/api/*splat', async (req: Request, res: Response) => {
     console.log("----------------------------------------");
-    console.log("📦 Fetching inventory from Katana...");
-
+    console.log("req body", req.body)
+    // Extract everything that comes after '/api' (e.g., '/inventory', '/products/123')
+    const targetPath = req.path.replace(/^\/api/, '');
+    console.log(targetPath)
     try {
-        // Katana's API endpoint for inventory balances
-        const data = await fetchFromKatana('/inventory');
-
-        console.log(`✅ Success! Fetched ${data.data?.length || 0} inventory items.`);
+        const data = await forwardToKatana(req, targetPath);
         res.json(data);
-    } catch (error) {
-        console.error("❌ Inventory Fetch Error:", error);
-        res.status(500).json({
-            error: "Failed to fetch inventory",
-            details: error instanceof Error ? error.message : String(error)
+    } catch (error: any) {
+        console.error(`❌ Katana Proxy Error on [${req.method} /api${targetPath}]:`, error);
+
+        const statusCode = error.status || 500;
+        res.status(statusCode).json({
+            error: `Failed to execute ${req.method} on Katana endpoint`,
+            details: error.message || String(error)
         });
     }
 });
-
-app.get('/api', (req: Request, res: Response) => {
-    console.log("----------------------------------------");
-    console.log("⚡ Pinged local /api endpoint!");
-
-    // Explicitly send a response back to Chrome!
-    res.json({ status: "ok", message: "Express server is active" });
-});
-
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running at http://localhost:${PORT}`);
