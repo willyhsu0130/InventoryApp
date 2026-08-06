@@ -13,33 +13,28 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const { setErrorMessage } = useError()
 
     // Shared refetch handler for manual triggers
+    // Shared refetch handler for background updates (does NOT trigger top-level page loading screens)
     const refetchProducts = useCallback(async () => {
-        setLoading(true);
-        // Get the variants obj and products obj
         const [variantsRes, productsRes] = await Promise.all([
             katanaFetch<KatanaVariant[]>(KATANA_API_ROUTES.VARIANTS),
             katanaFetch<KatanaProduct[]>(KATANA_API_ROUTES.PRODUCTS),
         ]);
-        // Check if both variants and products are valid 
+
         if (variantsRes.success && Array.isArray(variantsRes.data)) {
-            // Put all variants into a map
             const vMap = new Map<number, KatanaVariant>();
             variantsRes.data.forEach((v) => vMap.set(v.id, v));
-            setVariants(vMap);
+            setVariants(vMap); // React seamlessly merges new variants without unmounting UI
         }
 
         if (productsRes.success && Array.isArray(productsRes.data)) {
-            // Put all products into a map
             const pMap = new Map<number, KatanaProduct>();
             productsRes.data.forEach((p) => pMap.set(p.id, p));
-            setProducts(pMap);
+            setProducts(pMap); // React seamlessly updates products Map
         }
-        // If Error
+
         if (!variantsRes.success || !productsRes.success) {
             setErrorMessage("Failed to sync product metadata.");
         }
-
-        setLoading(false);
     }, [setErrorMessage]);
 
     // Initial mount sync using unmount flag safety

@@ -2,9 +2,10 @@
 import { useInventoryCatalog, useProductCatalog } from "../../hooks/useContexts";
 import { EditModal } from "../EditModal";
 import { useEffect, useState } from "react";
-import { useDebounce } from "../../lib/debouncer";
+// import { useDebounce } from "../../lib/debouncer";
 import { InlineInput } from "../InlineInput";
 import { ConfigOptionsEditor } from "./ConfigOptionEditor";
+import type { KatanaProductConfig } from "../../models/katana";
 
 
 interface EditProductProps {
@@ -15,16 +16,20 @@ interface EditProductProps {
 export const EditProduct = ({ id }: EditProductProps) => {
     const [modalOpen, setModalOpen] = useState<boolean>(false)
     const [isSaving, setIsSaving] = useState(false);
-    // const { setErrorMessage } = useError()
+    const [draftConfigs, setDraftConfigs] = useState<KatanaProductConfig[]>([]);
 
-    const { products, editProduct, editVariant } = useProductCatalog()
+    const handleOpenModal = () => {
+        if (formProduct) {
+            setDraftConfigs([...formProduct.configs]);
+        }
+        setModalOpen(true);
+    };
+
+    // Grab Contexts    
+    const { products, editProduct, editVariant, refetchProducts } = useProductCatalog()
     const { inventory } = useInventoryCatalog()
-    console.log(inventory)
+
     const product = products.get(id);
-
-    const [formProduct, setproduct] = useState(product);
-
-    const debouncedFormProduct = useDebounce(formProduct, 500);
 
     const handlePriceChange = async (variantIndex: number, newPrice: number) => {
         if (!formProduct) return;
@@ -47,20 +52,69 @@ export const EditProduct = ({ id }: EditProductProps) => {
 
     };
 
+    const [formProduct, setproduct] = useState(product);
+
+    // const debouncedFormProduct = useDebounce(formProduct, 500);
+
+
+
     // Whenever debounced state updates, fire editProduct
-    useEffect(() => {
-        if (debouncedFormProduct) {
-            console.log("Syncing changes to context/API:", debouncedFormProduct);
-            editProduct(debouncedFormProduct);
+    // useEffect(() => {
+    //     if (debouncedFormProduct) {
+    //         console.log("Syncing changes to context/API:", debouncedFormProduct);
+    //         editProduct(debouncedFormProduct);
+    //     }
+    // }, [debouncedFormProduct, editProduct]);
+
+    // Re-sync local form state when context finishes refetching
+
+    const handleSaveModal = async () => {
+        if (!formProduct) return;
+
+        if (!hasConfigChanges(formProduct.configs, draftConfigs)) {
+            setModalOpen(false);
+            return;
         }
-    }, [debouncedFormProduct, editProduct]);
-    const handleClose = () => {
-        setModalOpen(false)
+
+        setIsSaving(true);
+
+        try {
+            const updatedProduct = { ...formProduct, configs: draftConfigs };
+
+            // 1. Optimistically update local view first
+            setproduct(updatedProduct);
+
+            // 2. Send update to Katana API
+            await editProduct(updatedProduct);
+
+            // 3. Refresh variants from Katana
+            await refetchProducts();
+
+            // 4. Close modal
+            setModalOpen(false);
+        } catch (err) {
+            console.error("Failed to save configs", err);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    const handleSave = () => {
+    const hasConfigChanges = (
+        original: KatanaProductConfig[],
+        draft: KatanaProductConfig[]
+    ): boolean => {
+        return JSON.stringify(original) !== JSON.stringify(draft);
+    };
 
-    }
+    // Checkbox stuff
+    const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            // User checked "This product has multiple variants" -> open modal to configure options
+            handleOpenModal();
+        }
+    };
+
+
     if (!formProduct) {
         return (
             <div className="py-8 text-center text-slate-400 text-sm font-sans">
@@ -75,16 +129,14 @@ export const EditProduct = ({ id }: EditProductProps) => {
             <EditModal
                 title="編輯產品款式"
                 isOpen={modalOpen}
-                onClose={handleClose}
-                onSave={handleSave}
+                onClose={() => setModalOpen(false)}
+                onSave={handleSaveModal}
                 isSaving={isSaving}
             >
 
                 <ConfigOptionsEditor
-                    configs={formProduct.configs}
-                    onChange={(updatedConfigs) => {
-                        setproduct((prev) => (prev ? { ...prev, configs: updatedConfigs } : prev));
-                    }}
+                    configs={draftConfigs}
+                    onChange={setDraftConfigs}
                 />
 
             </EditModal>
@@ -107,7 +159,7 @@ export const EditProduct = ({ id }: EditProductProps) => {
                 <div>
                     {formProduct.configs.length > 0 ?
                         <div>
-                            <button onClick={() => setModalOpen((prev) => !prev)} className="bg-black p-3 rounded-xl">
+                            <button onClick={handleOpenModal} className="bg-black p-3 rounded-xl">
                                 調整產品規格
                             </button>
                             <table className="w-full">
@@ -167,8 +219,15 @@ export const EditProduct = ({ id }: EditProductProps) => {
 
                         </div>
                         :
-                        <div>
+                        <div >
                             <p>這個產品有不只一種款式嗎?</p>
+                            <div className="flex gap-x-3">
+                                <input
+                                    onChange={handleCheckboxChange}
+                                    className="rounded-2xl hover:bg-amber-50 b-5"
+                                    type="checkbox" />
+                                <p>設定款式</p>
+                            </div>
                         </div>
                     }
                 </div>
