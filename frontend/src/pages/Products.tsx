@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 import { useProductCatalog } from "../hooks/useContexts";
 import { ProductsTable, } from "../components/products/ProductsTable";
 import { Plus } from "lucide-react";
+import { useError } from "../hooks/useError";
 
 export interface DisplayProductRow {
     id: number;              // Product ID
@@ -18,10 +19,11 @@ export interface DisplayProductRow {
 
 
 export const Products = () => {
-    const { products, loading, error, refetchProducts } = useProductCatalog();
+    const { products, loading, refetchProducts } = useProductCatalog()
+    const { errorMessage } = useError()
     const [searchTerm, setSearchTerm] = useState<string>("");
     const handleCreateProduct = () => {
-
+        // TODO
     }
 
     const productList = useMemo<DisplayProductRow[]>(() => {
@@ -121,10 +123,10 @@ export const Products = () => {
                             準備畫面中
                         </p>
                     </div>
-                ) : error ? (
+                ) : errorMessage ? (
                     <div className="p-4 bg-red-950/40 border border-red-500/40 rounded-lg text-red-200 text-sm">
                         <p className="font-semibold">無法讀取產品目錄</p>
-                        <p className="text-xs font-mono mt-1 text-red-300">{error}</p>
+                        <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
                     </div>
                 ) : (
                     /* Products Table */

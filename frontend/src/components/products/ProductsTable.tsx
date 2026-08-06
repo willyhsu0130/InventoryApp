@@ -13,7 +13,6 @@ interface ProductsTableProps {
 
 export const ProductsTable = ({ items }: ProductsTableProps) => {
     const [selectedItem, setSelectedItem] = useState<DisplayProductRow | null>(null);
-
     const [isSaving, setIsSaving] = useState(false);
     const { editProduct, products } = useProductCatalog()
 
@@ -22,12 +21,13 @@ export const ProductsTable = ({ items }: ProductsTableProps) => {
     };
 
     const handleClose = () => {
+        // Prevent closing mid-auto-save
+        if (isSaving) return;
         setSelectedItem(null);
     };
 
     const handleSave = async () => {
         if (!selectedItem) return;
-        console.log("handle saving")
         setIsSaving(true);
 
         // Find the product in which this is from.
@@ -131,9 +131,10 @@ export const ProductsTable = ({ items }: ProductsTableProps) => {
                 onClose={handleClose}
                 onSave={handleSave}
                 isSaving={isSaving}
+                showSaveButton={false}
             >
                 {
-                    selectedItem && <EditProduct id={selectedItem.id} />
+                    selectedItem && <EditProduct id={selectedItem.id} onSavingChange={setIsSaving} />
                 }
                 {/* <div className="space-y-4">
                     <div>

@@ -1,35 +1,29 @@
 
 import { useInventoryCatalog, useProductCatalog } from "../../hooks/useContexts";
 import { EditModal } from "../EditModal";
-import { useEffect, useState } from "react";
-// import { useDebounce } from "../../lib/debouncer";
+import { useState } from "react";
 import { InlineInput } from "../InlineInput";
 import { ConfigOptionsEditor } from "./ConfigOptionEditor";
-import type { KatanaProductConfig } from "../../models/katana";
+import type { KatanaProduct, KatanaProductConfig } from "../../models/katana";
 
 
 interface EditProductProps {
     id: number;
+    onSavingChange?: (isSaving: boolean) => void;
     // onChange?: (updatedProduct: KatanaProduct) => void;
 }
 
-export const EditProduct = ({ id }: EditProductProps) => {
+export const EditProduct = ({ id, onSavingChange }: EditProductProps) => {
     const [modalOpen, setModalOpen] = useState<boolean>(false)
     const [isSaving, setIsSaving] = useState(false);
     const [draftConfigs, setDraftConfigs] = useState<KatanaProductConfig[]>([]);
 
-    const handleOpenModal = () => {
-        if (formProduct) {
-            setDraftConfigs([...formProduct.configs]);
-        }
-        setModalOpen(true);
-    };
-
     // Grab Contexts    
     const { products, editProduct, editVariant, refetchProducts } = useProductCatalog()
+    const product = products.get(id);
+    const [formProduct, setproduct] = useState(product);
     const { inventory } = useInventoryCatalog()
 
-    const product = products.get(id);
 
     const handlePriceChange = async (variantIndex: number, newPrice: number) => {
         if (!formProduct) return;
@@ -52,11 +46,33 @@ export const EditProduct = ({ id }: EditProductProps) => {
 
     };
 
-    const [formProduct, setproduct] = useState(product);
 
+    // Product stuff
+    const handleFieldChange = (field: keyof KatanaProduct, value: string) => {
+        setproduct((prev) => (prev ? { ...prev, [field]: value } : prev));
+    };
+
+    const handleCommit = async () => {
+        if (!formProduct || !product) return;
+
+        // Check if top-level fields actually changed before firing API call
+        const hasChanges =
+            formProduct.name !== product.name ||
+            formProduct.uom !== product.uom;
+        // Add other fields here: || formProduct.sku !== product.sku, etc.
+
+        if (!hasChanges) return;
+        onSavingChange?.(true);
+        try {
+            await editProduct(formProduct);
+            await refetchProducts();
+        } catch (err) {
+            console.error("Failed auto-save:", err);
+        } finally {
+            onSavingChange?.(false);
+        }
+    };
     // const debouncedFormProduct = useDebounce(formProduct, 500);
-
-
 
     // Whenever debounced state updates, fire editProduct
     // useEffect(() => {
@@ -68,6 +84,7 @@ export const EditProduct = ({ id }: EditProductProps) => {
 
     // Re-sync local form state when context finishes refetching
 
+    // Modal Stuff
     const handleSaveModal = async () => {
         if (!formProduct) return;
 
@@ -99,6 +116,13 @@ export const EditProduct = ({ id }: EditProductProps) => {
         }
     };
 
+    const handleOpenModal = () => {
+        if (formProduct) {
+            setDraftConfigs([...formProduct.configs]);
+        }
+        setModalOpen(true);
+    };
+
     const hasConfigChanges = (
         original: KatanaProductConfig[],
         draft: KatanaProductConfig[]
@@ -113,7 +137,6 @@ export const EditProduct = ({ id }: EditProductProps) => {
             handleOpenModal();
         }
     };
-
 
     if (!formProduct) {
         return (
@@ -142,95 +165,133 @@ export const EditProduct = ({ id }: EditProductProps) => {
             </EditModal>
 
             {/* Edit Products*/}
-            <div className="h-2/3">
+            <div className="h-2/3 gap-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Field 1: Name */}
+                    <div className="flex flex-col gap-y-1 col-span-2">
+                        <label className="text-xs text-slate-400 font-sans">產品名稱</label>
+                        <input
+                            type="text"
+                            value={formProduct.name}
+                            onChange={(e) => handleFieldChange("name", e.target.value)}
+                            onBlur={handleCommit}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            }}
+                            placeholder="名稱"
+                            className="text-xl bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-bold"
+                        />
+                    </div>
 
-                <input
-                    type="text"
-                    value={formProduct.name}
-                    // onChange={(e) => handleProductChange("name", e.target.value)}
-                    placeholder="名稱"
-                    className="text-2xl"
-                />
+                    {/* Field 2: Unit of Measure (UOM) */}
+                    <div className="flex flex-col gap-y-1">
+                        <label className="text-xs text-slate-400 font-sans">單位 (UOM)</label>
+                        <input
+                            type="text"
+                            value={formProduct.uom ?? ""}
+                            onChange={(e) => handleFieldChange("uom", e.target.value)}
+                            onBlur={handleCommit}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            }}
+                            placeholder="例如: pcs, box"
+                            className="bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-mono text-sm"
+                        />
+                    </div>
 
+                    {/* You can add any additional product field following this exact same pattern */}
+                </div>
             </div>
             {/* Edit Variants*/}
             <div className="h-1/3">
-                {/* Check if config length > 0  */}
-                <div>
-                    {formProduct.configs.length > 0 ?
-                        <div>
+                <div className="mb-5">
+                    {
+                        // Check if config length > 0 
+                        formProduct.configs.length > 0 ?
                             <button onClick={handleOpenModal} className="bg-black p-3 rounded-xl">
                                 調整產品規格
                             </button>
-                            <table className="w-full">
-                                <thead className="bg-slate-900/80 text-xs font-semibold text-slate-400 border-b border-slate-800">
-                                    <tr>
-                                        {formProduct.configs.map((config) => (
-                                            <th className="py-2.5 px-3">{config.name}</th>
-                                        ))}
-                                        <th className="py-2.5 px-3">銷售價格</th>
-                                        <th className="py-2.5 px-3">庫存量</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {variants.map((variant, v_index) => (
-                                        /* Table row */
-                                        <tr key={v_index}>
-                                            {/* Table col */}
-                                            {formProduct.configs.map((config, index) => {
-                                                // Find matching values for this config
-                                                const productConfigsName = config.name
-                                                const value = variant?.config_attributes?.find((attribute) => attribute.config_name === productConfigsName)?.config_value
-                                                console.log(value)
-                                                return (
-                                                    <td
-                                                        className="text-left p-2"
-                                                        key={index}>{value}
-                                                    </td>
-                                                )
-                                            })}
-
-                                            <td className="p-2">
-                                                <InlineInput
-                                                    type="number"
-                                                    value={variant.sales_price ?? 0}
-                                                    formatter={(val) => `$${val.toFixed(2)}`}
-                                                    onCommit={(newPrice) => handlePriceChange(v_index, newPrice)}
-                                                />
-                                            </td>
-
-                                            <td className="p-2">
-                                                <input
-                                                    className="w-full text-right"
-                                                    id={variant.id + "_quantity_in_stock"}
-                                                    type="number"
-
-                                                    value={inventory.get(variant.id)?.quantity_in_stock != null
-                                                        ? Number(inventory.get(variant.id)?.quantity_in_stock).toFixed(0) // 0 decimals for stock
-                                                        : 0}
-                                                    readOnly
-                                                />
-                                            </td>
-
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-
-                        </div>
-                        :
-                        <div >
-                            <p>這個產品有不只一種款式嗎?</p>
-                            <div className="flex gap-x-3">
-                                <input
-                                    onChange={handleCheckboxChange}
-                                    className="rounded-2xl hover:bg-amber-50 b-5"
-                                    type="checkbox" />
-                                <p>設定款式</p>
+                            :
+                            <div>
+                                <p>這個產品有不只一種款式嗎?</p>
+                                <div className="flex gap-x-3">
+                                    <input
+                                        checked={modalOpen}
+                                        onChange={handleCheckboxChange}
+                                        className="rounded-2xl hover:bg-amber-50 b-5"
+                                        type="checkbox" />
+                                    <p>設定款式</p>
+                                </div>
                             </div>
-                        </div>
                     }
                 </div>
+
+                <table className="w-full">
+                    <thead className="bg-slate-900/80 text-xs font-semibold text-slate-400 border-b border-slate-800">
+                        <tr>
+                            {formProduct.configs.length > 0 ?
+
+                                formProduct.configs.map((config) => (
+                                    <th className="py-2.5 px-3">{config.name}</th>
+                                ))
+
+                                :
+
+                                <th>款式</th>
+
+                            }
+                            <th className="py-2.5 px-3">銷售價格</th>
+                            <th className="py-2.5 px-3">庫存量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {variants.map((variant, v_index) => (
+                            /* Table row */
+                            <tr key={v_index}>
+                                {/* Table col */}
+                                {
+                                    formProduct.configs.length > 0 ?
+                                        formProduct.configs.map((config, index) => {
+                                            // Find matching values for this config
+                                            const productConfigsName = config.name
+                                            const value = variant?.config_attributes?.find((attribute) => attribute.config_name === productConfigsName)?.config_value
+
+                                            return (
+                                                <td
+                                                    className="text-left p-2"
+                                                    key={index}>{value}
+                                                </td>
+                                            )
+                                        })
+                                        :
+                                        <td className="py-2.5 px-3">N/A</td>
+                                }
+                                <td className="p-2">
+                                    <InlineInput
+                                        type="number"
+                                        value={variant.sales_price ?? 0}
+                                        formatter={(val) => `$${val.toFixed(2)}`}
+                                        onCommit={(newPrice) => handlePriceChange(v_index, newPrice)}
+                                    />
+                                </td>
+
+                                <td className="p-2">
+                                    <input
+                                        className="w-full text-right"
+                                        id={variant.id + "_quantity_in_stock"}
+                                        type="number"
+
+                                        value={inventory.get(variant.id)?.quantity_in_stock != null
+                                            ? Number(inventory.get(variant.id)?.quantity_in_stock).toFixed(0) // 0 decimals for stock
+                                            : 0}
+                                        readOnly
+                                    />
+                                </td>
+
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
 
             </div>
         </div>
