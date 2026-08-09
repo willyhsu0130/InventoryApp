@@ -6,9 +6,11 @@ import { DataTable, type Column } from "../DataTable";
 
 interface InventoryTableProps {
     items: KatanaInventoryItem[];
+    /** Opens a stock adjustment prefilled with the clicked variant. */
+    onRowClick?: (variantId: number) => void;
 }
 
-export const InventoryTable = ({ items }: InventoryTableProps) => {
+export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
     const productCtx = useContext(ProductContext);
 
     // Define column schemas tailored to inventory items
@@ -50,7 +52,7 @@ export const InventoryTable = ({ items }: InventoryTableProps) => {
                 return (
                     <span className="font-bold text-slate-100">
                         {parseFloat(item.quantity_in_stock)}{" "}
-                        <span className="text-slate-500 font-normal text-[10px]">
+                        <span className="text-white font-normal text-[10px]">
                             {details?.uom}
                         </span>
                     </span>
@@ -61,7 +63,7 @@ export const InventoryTable = ({ items }: InventoryTableProps) => {
             header: "使用",
             align: "right",
             render: (item) => (
-                <span className="text-slate-400">
+                <span className="text-white">
                     {parseFloat(item.quantity_committed)}
                 </span>
             ),
@@ -70,7 +72,7 @@ export const InventoryTable = ({ items }: InventoryTableProps) => {
             header: "預期",
             align: "right",
             render: (item) => (
-                <span className="text-slate-400">
+                <span className="text-white">
                     {parseFloat(item.quantity_expected)}
                 </span>
             ),
@@ -84,11 +86,11 @@ export const InventoryTable = ({ items }: InventoryTableProps) => {
 
                 return isShortage ? (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-950/60 text-amber-400 border border-amber-800/50 font-sans">
-                        Reorder ({missingOrExcess.toFixed(1)})
+                        不足 ({missingOrExcess.toFixed(1)})
                     </span>
                 ) : (
                     <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 font-sans">
-                        Optimal
+                        正常
                     </span>
                 );
             },
@@ -121,6 +123,7 @@ export const InventoryTable = ({ items }: InventoryTableProps) => {
                 data={items}
                 columns={columns}
                 keyExtractor={(item) => `${item.variant_id}-${item.location_id}`}
+                onRowClick={onRowClick ? (item) => onRowClick(item.variant_id) : undefined}
                 emptyMessage="No matching inventory items found."
             />
         </div>

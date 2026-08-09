@@ -1,11 +1,20 @@
 // src/components/common/EditModal.tsx
 import type { ReactNode } from "react";
+import { MoreVertical, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface EditModalProps {
     isOpen: boolean;
     title: string;
     onClose: () => void;
     onSave: () => void | Promise<void>;
+    onDelete?: () => void | Promise<void>;
     isSaving?: boolean;
     children: ReactNode;
     showSaveButton?: boolean;
@@ -16,6 +25,7 @@ export const EditModal = ({
     title,
     onClose,
     onSave,
+    onDelete,
     isSaving = false,
     showSaveButton = true,
     children,
@@ -29,7 +39,7 @@ export const EditModal = ({
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
                     <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
 
-                    <div className="flex gap-x-3">
+                    <div className="flex gap-x-3 items-center">
                         {/* Only meaningful when edits autosave — with a save button
                             present, nothing is stored until it is pressed. */}
                         {!showSaveButton && (
@@ -38,6 +48,27 @@ export const EditModal = ({
                                 :
                                 <p>所有修改已儲存</p>
                         )}
+                        {
+                            onDelete &&
+                            <DropdownMenu>
+                                <DropdownMenuTrigger
+                                    render={
+                                        <Button variant="secondary" size="icon">
+                                            <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                    }
+                                />
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                        variant="destructive"
+                                        onClick={onDelete}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        刪除產品
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        }
                         <button
                             onClick={onClose}
                             className="text-slate-400 hover:text-slate-200 text-sm p-1 rounded-md transition"

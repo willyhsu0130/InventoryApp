@@ -38,7 +38,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
             productsRes.data.forEach((p) => pMap.set(p.id, p));
             setProducts(pMap); // React seamlessly updates products Map
         }
-
         if (!variantsRes.success || !productsRes.success) {
             setErrorMessage("Failed to sync product metadata.");
         }
@@ -115,7 +114,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
         // 2. Call the PATCH /products/{id} endpoint
         const endpoint = KATANA_API_ROUTES.PRODUCT_BY_ID(updatedProduct.id);
-        console.log(payload)
+
         const res = await katanaFetch<KatanaProduct>(endpoint, {
             method: "PATCH",
             body: JSON.stringify(payload),
@@ -127,6 +126,25 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
     }, [setErrorMessage]);
 
+    const deleteProduct = useCallback(async (id: KatanaProduct["id"]) => {
+        const endpoint = KATANA_API_ROUTES.PRODUCT_BY_ID(id);
+
+        const res = await katanaFetch<void>(endpoint, {
+            method: "DELETE",
+        });
+
+        if (!res.success) {
+            const message = res.message || "Delete failed";
+            setErrorMessage(message);
+            throw new Error(message);
+        }
+
+        setProducts((prev) => {
+            const next = new Map(prev);
+            next.delete(id);
+            return next;
+        });
+    }, [setErrorMessage]);
 
     const editVariant = useCallback(async (updatedVariant: SavedDraftVariant): Promise<KatanaVariant> => {
         // 1. Convert KatanaVariant to KatanaUpdateVariantPayload (writable/sanitized fields)
@@ -191,6 +209,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 editProduct,
                 editVariant,
                 createProduct,
+                deleteProduct,
                 products
             }}
         >

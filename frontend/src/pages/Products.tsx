@@ -22,7 +22,7 @@ export interface DisplayProductRow {
 
 
 export const Products = () => {
-    const { products, loading, refetchProducts } = useProductCatalog()
+    const { products, loading, refetchProducts, deleteProduct } = useProductCatalog()
     const { errorMessage } = useError()
     const [searchTerm, setSearchTerm] = useState<string>("");
     // selectedProductId: null = closed, UNSAVED_PRODUCT_ID = create mode, >0 = edit mode
@@ -36,6 +36,12 @@ export const Products = () => {
     const handleCreateProduct = () => {
         setSelectedProductId(UNSAVED_PRODUCT_ID);
     };
+
+    const handleDeleteProduct = () => {
+        if (!selectedProductId) return
+        deleteProduct(selectedProductId)
+        setSelectedProductId(null)
+    }
 
     const handleCloseModal = () => {
         // Prevent closing modal while background saving is active
@@ -152,6 +158,7 @@ export const Products = () => {
                 title={isCreating ? "新增產品" : "編輯產品"}
                 onClose={handleCloseModal}
                 onSave={() => editProductRef.current?.submit()}
+                onDelete={handleDeleteProduct}
                 showSaveButton={isCreating}
                 isSaving={isSaving}
             >

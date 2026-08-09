@@ -1,9 +1,11 @@
 
 import { useImperativeHandle, useState } from "react";
-import { useInventoryCatalog, useProductCatalog } from "../../hooks/useContexts";
-import { EditModal } from "../EditModal";
+import { useInventoryCatalog, useProductCatalog } from "@/hooks/useContexts";
+import { EditModal } from "../EditModal"
 import { InlineInput } from "../InlineInput";
 import { ConfigOptionsEditor } from "./ConfigOptionEditor";
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
     createEmptyProductDraft,
     isUnsavedProduct,
@@ -46,7 +48,6 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         () => products.get(id) ?? createEmptyProductDraft()
     );
     const { inventory } = useInventoryCatalog()
-
     /**
      * Apply a change to one variant row, then persist it if that row already
      * exists in Katana. Unsaved rows have no id to PATCH against.
@@ -229,43 +230,57 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
 
             {/* Edit Products*/}
             <div className="h-2/3 gap-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                    {/* Field 1: Name */}
-                    <div className="flex flex-col gap-y-1 col-span-2">
-                        <label className="text-xs text-slate-400 font-sans">產品名稱</label>
-                        <input
-                            type="text"
-                            value={formProduct.name}
-                            onChange={(e) => handleFieldChange("name", e.target.value)}
-                            onBlur={handleCommit}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                            }}
-                            placeholder="名稱"
-                            className="text-xl bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-bold"
-                        />
-                    </div>
+    <div className="grid grid-cols-2 gap-4">
+        {/* Field 1: Name */}
+        <div className="flex flex-col gap-y-1 col-span-2">
+            <label className="text-xs text-slate-400 font-sans">產品名稱</label>
+            <input
+                type="text"
+                value={formProduct.name}
+                onChange={(e) => handleFieldChange("name", e.target.value)}
+                onBlur={handleCommit}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                placeholder="名稱"
+                className="text-xl bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-bold"
+            />
+        </div>
 
-                    {/* Field 2: Unit of Measure (UOM) */}
-                    <div className="flex flex-col gap-y-1">
-                        <label className="text-xs text-slate-400 font-sans">單位 (UOM)</label>
-                        <input
-                            type="text"
-                            maxLength={UOM_MAX_LENGTH}
-                            value={formProduct.uom ?? ""}
-                            onChange={(e) => handleFieldChange("uom", e.target.value)}
-                            onBlur={handleCommit}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                            }}
-                            placeholder="例如: pcs, box"
-                            className="bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-mono text-sm"
-                        />
-                    </div>
+        {/* Field 2a: Unit of Measure (UOM) — its own grid cell */}
+        <div className="flex flex-col gap-y-1">
+            <label className="text-xs text-slate-400 font-sans">單位 (UOM)</label>
+            <input
+                type="text"
+                maxLength={UOM_MAX_LENGTH}
+                value={formProduct.uom ?? ""}
+                onChange={(e) => handleFieldChange("uom", e.target.value)}
+                onBlur={handleCommit}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                placeholder="例如: pcs, box"
+                className="bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-mono text-sm"
+            />
+        </div>
 
-                    {/* You can add any additional product field following this exact same pattern */}
+        {/* Field 2b: Category radio group — its own grid cell */}
+        <div className="flex items-end">
+            <RadioGroup className="flex flex-row space-x-4" defaultValue="option-1">
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem id="h1" value="option-1" />
+                    <Label htmlFor="h1">不需要分類</Label>
                 </div>
-            </div>
+                <div className="flex items-center space-x-2">
+                    <RadioGroupItem id="h2" value="option-2" />
+                    <Label htmlFor="h2">以批次/日期分類</Label>
+                </div>
+            </RadioGroup>
+        </div>
+
+        {/* Next field pairs will naturally continue the 2-column pattern */}
+    </div>
+</div>
             {/* Edit Variants*/}
             <div className="h-1/3">
                 <div className="mb-5">

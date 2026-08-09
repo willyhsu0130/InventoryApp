@@ -46,7 +46,7 @@ async function forwardToKatana(req: Request, targetPath: string) {
     };
 
     // Attach request body for state-changing methods (POST, PUT, PATCH)
-    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && Object.keys(req.body).length > 0) {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
         options.body = typeof req.body === 'string'
             ? req.body
             : JSON.stringify(req.body);
