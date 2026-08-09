@@ -1,5 +1,5 @@
 import { InventoryContext } from "./InventoryContext";
-import type { KatanaInventoryItem } from "../pages/Inventory";
+import type { KatanaInventoryItem } from "../models/katana";
 import { useEffect, useMemo, useState } from "react";
 import { katanaFetch } from "../lib/katanaFetch";
 import { KATANA_API_ROUTES } from "../lib/routes/routes";

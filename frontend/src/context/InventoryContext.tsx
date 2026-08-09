@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { KatanaInventoryItem } from "../pages/Inventory";
+import type { KatanaInventoryItem } from "../models/katana";
 interface InventoryContextType {
     inventory: Map<number, KatanaInventoryItem>
 }

@@ -1,5 +1,13 @@
 import { createContext } from "react";
-import type { KatanaProduct, KatanaVariant } from "../models/katana";
+import type {
+    KatanaProduct,
+    KatanaProductDraft,
+    KatanaProductDraftVariant,
+    KatanaVariant,
+} from "../models/katana";
+
+/** A variant that already exists in Katana, so it can be PATCHed by id. */
+export type SavedDraftVariant = KatanaProductDraftVariant & { id: number };
 
 export interface ResolvedVariantInfo {
     productId: number
@@ -16,8 +24,10 @@ interface ProductContextType {
     loading: boolean;
     getVariantDetails: (variant_id: number) => ResolvedVariantInfo;
     refetchProducts: () => Promise<void>;
-    editProduct: (updatedProduct: KatanaProduct) => Promise<void>
-    editVariant: (updatedProduct: KatanaVariant) => Promise<KatanaVariant>
+    editProduct: (updatedProduct: KatanaProductDraft) => Promise<void>
+    editVariant: (updatedProduct: SavedDraftVariant) => Promise<KatanaVariant>
+    /** POST /products. Resolves to the product Katana created. */
+    createProduct: (draft: KatanaProductDraft) => Promise<KatanaProduct>
 }
 
 export const ProductContext = createContext<ProductContextType | undefined>(undefined);

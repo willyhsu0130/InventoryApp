@@ -1,11 +1,12 @@
 // src/pages/Products.tsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useProductCatalog } from "../hooks/useContexts";
 import { ProductsTable, } from "../components/products/ProductsTable";
 import { Plus } from "lucide-react";
 import { useError } from "../hooks/useError";
 import { EditModal } from "../components/EditModal";
-import { EditProduct } from "../components/products/EditProduct";
+import { EditProduct, type EditProductHandle } from "../components/products/EditProduct";
+import { UNSAVED_PRODUCT_ID } from "../models/katana";
 
 export interface DisplayProductRow {
     id: number;              // Product ID
@@ -24,14 +25,16 @@ export const Products = () => {
     const { products, loading, refetchProducts } = useProductCatalog()
     const { errorMessage } = useError()
     const [searchTerm, setSearchTerm] = useState<string>("");
-    // selectedProductId: null = closed, -1 = create mode, >0 = edit mode
+    // selectedProductId: null = closed, UNSAVED_PRODUCT_ID = create mode, >0 = edit mode
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
+    const editProductRef = useRef<EditProductHandle>(null);
+
+    // Edits autosave on blur; only an unsaved draft needs an explicit save action.
+    const isCreating = selectedProductId === UNSAVED_PRODUCT_ID;
 
     const handleCreateProduct = () => {
-        setSelectedProductId(-1);
-        console.log("creating product")
-        
+        setSelectedProductId(UNSAVED_PRODUCT_ID);
     };
 
     const handleCloseModal = () => {
@@ -146,16 +149,20 @@ export const Products = () => {
             </div>
             <EditModal
                 isOpen={selectedProductId !== null}
-                title={selectedProductId === -1 ? "新增產品" : "編輯產品"}
+                title={isCreating ? "新增產品" : "編輯產品"}
                 onClose={handleCloseModal}
-                onSave={() => { }}
-                showSaveButton={false}
+                onSave={() => editProductRef.current?.submit()}
+                showSaveButton={isCreating}
                 isSaving={isSaving}
             >
                 {selectedProductId !== null && (
                     <EditProduct
-                        id={selectedProductId === -1 ? -1 : selectedProductId}
+                        // Remount per product so the form never shows a stale draft.
+                        key={selectedProductId}
+                        ref={editProductRef}
+                        id={selectedProductId}
                         onSavingChange={setIsSaving}
+                        onCreated={() => setSelectedProductId(null)}
                     />
                 )}
             </EditModal>

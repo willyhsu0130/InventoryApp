@@ -30,12 +30,14 @@ export const EditModal = ({
                     <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
 
                     <div className="flex gap-x-3">
-                        {
+                        {/* Only meaningful when edits autosave — with a save button
+                            present, nothing is stored until it is pressed. */}
+                        {!showSaveButton && (
                             isSaving ?
                                 <p>儲存中...</p>
                                 :
                                 <p>所有修改已儲存</p>
-                        }
+                        )}
                         <button
                             onClick={onClose}
                             className="text-slate-400 hover:text-slate-200 text-sm p-1 rounded-md transition"

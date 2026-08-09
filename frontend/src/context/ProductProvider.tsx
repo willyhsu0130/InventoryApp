@@ -1,8 +1,15 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { katanaFetch } from "../lib/katanaFetch";
-import { ProductContext, type ResolvedVariantInfo } from "./ProductContext";
+import { ProductContext, type ResolvedVariantInfo, type SavedDraftVariant } from "./ProductContext";
 
-import { convertProductToPayload, convertVariantToPayload, type KatanaProduct, type KatanaVariant } from "../models/katana";
+import {
+    convertProductToCreatePayload,
+    convertProductToPayload,
+    convertVariantToPayload,
+    type KatanaProduct,
+    type KatanaProductDraft,
+    type KatanaVariant,
+} from "../models/katana";
 import { KATANA_API_ROUTES } from "../lib/routes/routes";
 import { useError } from "../hooks/useError";
 
@@ -102,7 +109,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
     }, [variants, products]);
 
-    const editProduct = useCallback(async (updatedProduct: KatanaProduct) => {
+    const editProduct = useCallback(async (updatedProduct: KatanaProductDraft) => {
         // 1. Convert KatanaProduct to KatanaUpdateProductPayload by extracting only writable fields
         const payload = convertProductToPayload(updatedProduct);
 
@@ -121,7 +128,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [setErrorMessage]);
 
 
-    const editVariant = useCallback(async (updatedVariant: KatanaVariant): Promise<KatanaVariant> => {
+    const editVariant = useCallback(async (updatedVariant: SavedDraftVariant): Promise<KatanaVariant> => {
         // 1. Convert KatanaVariant to KatanaUpdateVariantPayload (writable/sanitized fields)
         const payload = convertVariantToPayload(updatedVariant);
 
@@ -150,6 +157,30 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }, [setErrorMessage]);
 
 
+    const createProduct = useCallback(async (draft: KatanaProductDraft): Promise<KatanaProduct> => {
+        // POST /products creates the product and all of its variants in one call —
+        // `variants` is required with minItems: 1.
+        const payload = convertProductToCreatePayload(draft);
+
+        const res = await katanaFetch<KatanaProduct>(KATANA_API_ROUTES.PRODUCTS, {
+            method: "POST",
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.success) {
+            const errorMsg = res.message || "Failed to create product";
+            setErrorMessage(errorMsg);
+            throw new Error(errorMsg); // Rethrow so the form can keep the user's input
+        }
+
+        // Katana generates the variant rows, so pull the authoritative copy back
+        // rather than trusting the shape of the create response.
+        await refetchProducts();
+
+        return res.data;
+    }, [refetchProducts, setErrorMessage]);
+
+
     return (
         <ProductContext.Provider
             value={{
@@ -159,6 +190,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 refetchProducts,
                 editProduct,
                 editVariant,
+                createProduct,
                 products
             }}
         >

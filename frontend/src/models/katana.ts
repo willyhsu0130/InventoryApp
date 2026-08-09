@@ -51,7 +51,7 @@ export interface KatanaProductInput {
     custom_field_collection_id?: number | null;
 }
 
-export const convertProductToPayload = (product: KatanaProduct): KatanaUpdateProductPayload => {
+export const convertProductToPayload = (product: KatanaProductDraft): KatanaUpdateProductPayload => {
     const {
         name,
         uom,
@@ -172,7 +172,7 @@ export interface KatanaVariant extends KatanaVariantInput {
     updated_at: string;
     abc_classification?: "A" | "B" | "C" | null;
 }
-export const convertVariantToPayload = (variant: KatanaVariant): KatanaUpdateVariantPayload => {
+export const convertVariantToPayload = (variant: KatanaVariantInput): KatanaUpdateVariantPayload => {
     const {
         sku,
         sales_price,
@@ -231,6 +231,252 @@ export const convertVariantToPayload = (variant: KatanaVariant): KatanaUpdateVar
         ...(cleanSupplierItemCodes && cleanSupplierItemCodes.length > 0 && { supplier_item_codes: cleanSupplierItemCodes }),
         ...(cleanConfigAttributes && cleanConfigAttributes.length > 0 && { config_attributes: cleanConfigAttributes }),
         ...(cleanCustomFields && cleanCustomFields.length > 0 && { custom_fields: cleanCustomFields }),
+    };
+};
+
+// ==========================================
+// PRODUCT DRAFTS (shared by the create + edit form)
+// ==========================================
+
+/** Sentinel id for a product that exists only in the form, not yet in Katana. */
+export const UNSAVED_PRODUCT_ID = -1;
+
+export const isUnsavedProduct = (id: number): boolean => id === UNSAVED_PRODUCT_ID;
+
+/**
+ * A variant row in the product form. Unsaved rows have no `id` yet — Katana
+ * assigns one when the parent product is POSTed.
+ */
+export interface KatanaProductDraftVariant extends KatanaVariantInput {
+    id?: number;
+    config_attributes: KatanaVariantConfigAttribute[];
+}
+
+/**
+ * Form state for the product editor. A saved `KatanaProduct` is assignable to
+ * this, so one component can edit both saved and unsaved products. Unsaved
+ * drafts carry `id === UNSAVED_PRODUCT_ID` and lack the server-only metadata
+ * (`type`, `created_at`, `updated_at`) that `KatanaProduct` requires.
+ */
+export interface KatanaProductDraft extends KatanaProductInput {
+    id: number;
+    configs: KatanaProductConfig[];
+    variants: KatanaProductDraftVariant[];
+}
+
+export const createEmptyProductDraft = (): KatanaProductDraft => ({
+    id: UNSAVED_PRODUCT_ID,
+    name: "",
+    uom: "pcs",
+    category_name: null,
+    default_supplier_id: null,
+    additional_info: null,
+    purchase_uom: null,
+    purchase_uom_conversion_rate: null,
+    is_sellable: true,
+    is_purchasable: true,
+    is_producible: false,
+    is_auto_assembly: false,
+    batch_tracked: false,
+    serial_tracked: false,
+    operations_in_sequence: false,
+    configs: [],
+    // POST /products requires minItems: 1, so a config-less product still ships one row.
+    variants: [{ config_attributes: [] }],
+});
+
+/**
+ * Every combination of the given config options, in config order.
+ * Returns [] when there is nothing usable to combine.
+ */
+export const buildConfigCombinations = (
+    configs: KatanaProductConfig[]
+): KatanaVariantConfigAttribute[][] => {
+    const usable = configs.filter(
+        (config) => config.name.trim().length > 0 && config.values.length > 0
+    );
+
+    if (usable.length === 0) return [];
+
+    return usable.reduce<KatanaVariantConfigAttribute[][]>(
+        (combinations, config) =>
+            combinations.flatMap((combination) =>
+                config.values.map((value) => [
+                    ...combination,
+                    { config_name: config.name, config_value: value },
+                ])
+            ),
+        [[]]
+    );
+};
+
+const configAttributesKey = (attributes: KatanaVariantConfigAttribute[]): string =>
+    attributes.map((attr) => `${attr.config_name}=${attr.config_value}`).join("|");
+
+/**
+ * Rebuild a draft's variant rows for a new set of configs, carrying over the
+ * SKU/prices already typed for any combination that still exists.
+ */
+export const syncDraftVariantsToConfigs = (
+    configs: KatanaProductConfig[],
+    existing: KatanaProductDraftVariant[]
+): KatanaProductDraftVariant[] => {
+    const combinations = buildConfigCombinations(configs);
+
+    // No usable configs — collapse back to the single unconfigured row.
+    if (combinations.length === 0) {
+        return [{ ...existing[0], config_attributes: [] }];
+    }
+
+    const previousByKey = new Map(
+        existing.map((variant) => [configAttributesKey(variant.config_attributes), variant])
+    );
+
+    return combinations.map((config_attributes) => ({
+        ...previousByKey.get(configAttributesKey(config_attributes)),
+        config_attributes,
+    }));
+};
+
+// ==========================================
+// PRODUCT CREATE PAYLOAD
+// Ref: https://developer.katanamrp.com/reference/create-product
+// ==========================================
+
+/**
+ * Variant fields accepted by POST /products. Deliberately narrower than
+ * KatanaUpdateVariantPayload: on create, `lead_time` and
+ * `minimum_order_quantity` are product-level, and product_id/material_id are
+ * implied by the parent product.
+ */
+export interface KatanaCreateVariantPayload {
+    sku?: string;
+    sales_price?: number;
+    purchase_price?: number;
+    internal_barcode?: string;
+    registered_barcode?: string;
+    supplier_item_codes?: string[];
+    config_attributes?: KatanaVariantConfigAttribute[];
+    custom_fields?: KatanaCustomField[];
+}
+
+/** Body for POST /products. Only `name` and `variants` are required. */
+export interface KatanaCreateProductPayload {
+    name: string;
+    /** Required by the API, minItems: 1. */
+    variants: KatanaCreateVariantPayload[];
+    uom?: string;
+    category_name?: string;
+    additional_info?: string;
+    default_supplier_id?: number;
+    purchase_uom?: string;
+    purchase_uom_conversion_rate?: number;
+    is_sellable?: boolean;
+    is_purchasable?: boolean;
+    is_producible?: boolean;
+    is_auto_assembly?: boolean;
+    batch_tracked?: boolean;
+    serial_tracked?: boolean;
+    operations_in_sequence?: boolean;
+    configs?: KatanaProductConfig[];
+    custom_field_collection_id?: number;
+    lead_time?: number;
+    minimum_order_quantity?: number;
+}
+
+const convertDraftVariantToCreatePayload = (
+    variant: KatanaProductDraftVariant
+): KatanaCreateVariantPayload => {
+    const cleanSku = variant.sku?.trim() || undefined;
+
+    // Both barcode fields are minLength: 3.
+    const cleanInternalBarcode =
+        variant.internal_barcode && variant.internal_barcode.trim().length >= 3
+            ? variant.internal_barcode.trim()
+            : undefined;
+
+    const cleanRegisteredBarcode =
+        variant.registered_barcode && variant.registered_barcode.trim().length >= 3
+            ? variant.registered_barcode.trim()
+            : undefined;
+
+    // supplier_item_codes / config_attributes / custom_fields are all minItems: 1,
+    // so an empty array is a 422 — omit the key instead.
+    const cleanSupplierItemCodes = variant.supplier_item_codes?.filter(
+        (code) => code.trim().length > 0
+    );
+
+    const cleanCustomFields = variant.custom_fields?.filter(
+        (field) => field.field_name.trim().length > 0
+    );
+
+    return {
+        ...(cleanSku !== undefined && { sku: cleanSku }),
+        ...(variant.sales_price != null && { sales_price: variant.sales_price }),
+        ...(variant.purchase_price != null && { purchase_price: variant.purchase_price }),
+        ...(cleanInternalBarcode !== undefined && { internal_barcode: cleanInternalBarcode }),
+        ...(cleanRegisteredBarcode !== undefined && {
+            registered_barcode: cleanRegisteredBarcode,
+        }),
+        ...(cleanSupplierItemCodes?.length && {
+            supplier_item_codes: cleanSupplierItemCodes,
+        }),
+        ...(variant.config_attributes.length > 0 && {
+            config_attributes: variant.config_attributes,
+        }),
+        ...(cleanCustomFields?.length && { custom_fields: cleanCustomFields }),
+    };
+};
+
+/**
+ * Build the POST /products body from form state.
+ *
+ * Blank/null optionals are omitted rather than sent: `default_supplier_id` and
+ * `purchase_uom_conversion_rate` are non-nullable in the schema, so sending
+ * null returns 422. `purchase_uom` and its conversion rate are only valid as a
+ * pair.
+ */
+export const convertProductToCreatePayload = (
+    draft: KatanaProductDraft
+): KatanaCreateProductPayload => {
+    const cleanUom = draft.uom?.trim() || undefined;
+    const cleanCategoryName = draft.category_name?.trim() || undefined;
+    const cleanAdditionalInfo = draft.additional_info?.trim() || undefined;
+
+    const cleanPurchaseUom = draft.purchase_uom?.trim() || undefined;
+    const hasPurchaseUomPair =
+        cleanPurchaseUom !== undefined && draft.purchase_uom_conversion_rate != null;
+
+    const cleanConfigs = draft.configs
+        .filter((config) => config.name.trim().length > 0 && config.values.length > 0)
+        .map((config) => ({ name: config.name.trim(), values: config.values }));
+
+    return {
+        name: draft.name.trim(),
+        variants: draft.variants.map(convertDraftVariantToCreatePayload),
+        ...(cleanUom !== undefined && { uom: cleanUom }),
+        ...(cleanCategoryName !== undefined && { category_name: cleanCategoryName }),
+        ...(cleanAdditionalInfo !== undefined && { additional_info: cleanAdditionalInfo }),
+        ...(draft.default_supplier_id != null && {
+            default_supplier_id: draft.default_supplier_id,
+        }),
+        ...(hasPurchaseUomPair && {
+            purchase_uom: cleanPurchaseUom,
+            purchase_uom_conversion_rate: draft.purchase_uom_conversion_rate!,
+        }),
+        ...(draft.is_sellable !== undefined && { is_sellable: draft.is_sellable }),
+        ...(draft.is_purchasable !== undefined && { is_purchasable: draft.is_purchasable }),
+        ...(draft.is_producible !== undefined && { is_producible: draft.is_producible }),
+        ...(draft.is_auto_assembly !== undefined && {
+            is_auto_assembly: draft.is_auto_assembly,
+        }),
+        ...(draft.batch_tracked !== undefined && { batch_tracked: draft.batch_tracked }),
+        ...(draft.serial_tracked !== undefined && { serial_tracked: draft.serial_tracked }),
+        ...(draft.operations_in_sequence !== undefined && {
+            operations_in_sequence: draft.operations_in_sequence,
+        }),
+        // configs is minItems: 1 — omit rather than send [].
+        ...(cleanConfigs.length > 0 && { configs: cleanConfigs }),
     };
 };
 
