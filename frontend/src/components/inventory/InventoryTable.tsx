@@ -1,6 +1,6 @@
 // src/components/inventory/InventoryTable.tsx
 import { useContext } from "react";
-import type { KatanaInventoryItem } from "../../pages/Inventory";
+import type { KatanaInventoryItem } from "../../models/katana";
 import { ProductContext } from "../../context/ProductContext";
 import { DataTable, type Column } from "../DataTable";
 
@@ -116,11 +116,14 @@ export const InventoryTable = ({ items }: InventoryTableProps) => {
     ];
 
     return (
-        <DataTable
-            data={items}
-            columns={columns}
-            keyExtractor={(item) => `${item.variant_id}-${item.location_id}`}
-            emptyMessage="No matching inventory items found."
-        />
+        <div className="flex flex-col gap-y-3 h-full min-h-0">
+            <DataTable
+                data={items}
+                columns={columns}
+                keyExtractor={(item) => `${item.variant_id}-${item.location_id}`}
+                emptyMessage="No matching inventory items found."
+            />
+        </div>
+
     );
 };

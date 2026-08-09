@@ -1,61 +1,20 @@
 // src/components/products/ProductsTable.tsx
-import { useState } from "react";
 import { DataTable, type Column } from "../DataTable";
-import { EditModal } from "../EditModal";
-
-import { useProductCatalog } from "../../hooks/useContexts";
 import type { DisplayProductRow } from "../../pages/Products";
-import { EditProduct } from "./EditProduct";
 
 interface ProductsTableProps {
     items: DisplayProductRow[]
+    onRowClick: (productId: number) => void;
 }
-
-export const ProductsTable = ({ items }: ProductsTableProps) => {
-    const [selectedItem, setSelectedItem] = useState<DisplayProductRow | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
-    const { editProduct, products } = useProductCatalog()
-
-    const handleRowClick = (item: DisplayProductRow) => {
-        setSelectedItem(item);
-    };
-
-    const handleClose = () => {
-        // Prevent closing mid-auto-save
-        if (isSaving) return;
-        setSelectedItem(null);
-    };
-
-    const handleSave = async () => {
-        if (!selectedItem) return;
-        setIsSaving(true);
-
-        // Find the product in which this is from.
-        const productId = selectedItem.id;
-        const product = products.get(productId)
-
-        try {
-            if (product) await editProduct(product);
-            handleClose();
-        } catch (err) {
-            console.error("Failed to update product variant:", err);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
+export const ProductsTable = ({ items, onRowClick }: ProductsTableProps) => {
     const columns: Column<DisplayProductRow>[] = [
         {
             header: "",
             align: "center",
             className: "w-10",
-            render: (item) => (
+            render: () => (
                 <button
                     type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        handleRowClick(item);
-                    }}
                     className="text-slate-500 hover:text-emerald-400 p-1 rounded-md hover:bg-slate-800 transition"
                     title="編輯"
                 >
@@ -115,69 +74,17 @@ export const ProductsTable = ({ items }: ProductsTableProps) => {
     ];
 
     return (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-800">
+        <div className="h-full min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-800">
             <DataTable
                 data={items}
                 columns={columns}
                 keyExtractor={(item) => item.variantId}
-                onRowClick={handleRowClick}
+                onRowClick={(item) => onRowClick(item.id)}
                 emptyMessage="查無符合條件的產品。"
             />
 
             {/* Edit Modal */}
-            <EditModal
-                isOpen={Boolean(selectedItem)}
-                title={`編輯產品 (ID: #${selectedItem?.variantId})`}
-                onClose={handleClose}
-                onSave={handleSave}
-                isSaving={isSaving}
-                showSaveButton={false}
-            >
-                {
-                    selectedItem && <EditProduct id={selectedItem.id} onSavingChange={setIsSaving} />
-                }
-                {/* <div className="space-y-4">
-                    <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1 font-sans">
-                            產品名稱
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.name || ""}
-                            onChange={(e) =>
-                                setFormData({ ...formData, name: e.target.value })
-                            }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none transition font-sans"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1 font-sans">
-                            SKU
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.sku || ""}
-                            onChange={(e) =>
-                                setFormData({ ...formData, sku: e.target.value })
-                            }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none transition font-mono"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1 font-sans">
-                            單位 (UOM)
-                        </label>
-                        <input
-                            type="text"
-                            value={formData.uom || ""}
-                            onChange={(e) =>
-                                setFormData({ ...formData, uom: e.target.value })
-                            }
-                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none transition font-mono"
-                        />
-                    </div>
-                </div> */}
-            </EditModal>
+           
         </div>
     );
 };

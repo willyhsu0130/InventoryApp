@@ -280,6 +280,269 @@ export interface KatanaSalesOrder {
 }
 
 // ==========================================
+// 3. KATANA LOCATIONS
+// Ref: https://developer.katanamrp.com/reference/the-purchase-order-object
+// ==========================================
+
+export interface KatanaAddress {
+    id: number;
+    line_1: string;
+    line_2?: string | null;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+}
+
+export interface KatanaLocation {
+    id: number;
+    name: string;
+    legal_name?: string | null;
+    address_id: number;
+    address?: KatanaAddress;
+    is_primary: boolean;
+    sales_allowed: boolean;
+    manufacturing_allowed: boolean;
+    purchase_allowed: boolean;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+export interface KatanaInventoryItem {
+    variant_id: number;
+    location_id: number;
+    reorder_point: string;             // Decimal string (e.g. "5.00000")
+    average_cost: string;              // Decimal string (e.g. "10.0000000000")
+    value_in_stock: string;            // Decimal string (e.g. "70.0000000000")
+    quantity_in_stock: string;         // Decimal string
+    quantity_committed: string;        // Decimal string
+    quantity_expected: string;         // Decimal string
+    quantity_missing_or_excess: string;// Decimal string
+    quantity_potential: string;        // Decimal string
+
+    // Included when using query parameter: extend=["variant"]
+    variant?: KatanaVariant;
+
+    // Included when using query parameter: extend=["location"]
+    location?: KatanaLocation;
+}
+
+// ==========================================
+// 4. KATANA STOCK ADJUSTMENTS
+// Ref: https://developer.katanamrp.com/reference/the-stock-adjustment-object
+// ==========================================
+
+export interface KatanaTraceabilityEntry {
+    batch_id?: number | null;
+    serial_number_id?: number | null;
+    bin_location_id?: number | null;
+    /** Decimal string quantity required by Katana API (e.g., "50" or "1.5") */
+    quantity: string;
+}
+
+/** @deprecated Use KatanaTraceabilityEntry instead */
+export interface KatanaBatchTransaction {
+    batch_id: number | null;
+    quantity: number;
+}
+
+export interface KatanaStockAdjustmentRowInput {
+    variant_id: number;
+    quantity: number;
+    cost_per_unit?: number | null;
+    traceability?: KatanaTraceabilityEntry[];
+    /** @deprecated Use traceability */
+    batch_transactions?: KatanaBatchTransaction[];
+}
+
+export interface KatanaStockAdjustmentInput {
+    location_id: number;
+    stock_adjustment_number?: string | null;
+    stock_adjustment_date?: string | null;
+    reason?: string | null;
+    additional_info?: string | null;
+    stock_adjustment_rows: KatanaStockAdjustmentRowInput[];
+}
+
+/**
+ * Payload type for POST /stock_adjustments.
+ */
+export interface CreateStockAdjustmentPayload {
+    location_id: number;
+    stock_adjustment_number?: string;
+    stock_adjustment_date?: string;
+    reason?: string;
+    additional_info?: string;
+    stock_adjustment_rows: CreateStockAdjustmentRowPayload[];
+}
+
+export interface CreateStockAdjustmentRowPayload {
+    variant_id: number;
+    quantity: number;
+    cost_per_unit?: number;
+    traceability?: KatanaTraceabilityEntry[];
+    /** @deprecated Use traceability */
+    batch_transactions?: KatanaBatchTransaction[];
+}
+
+/**
+ * Payload type for PATCH /stock_adjustments/{id}.
+ * Only top-level fields can be updated per Katana OpenAPI definition.
+ */
+export type KatanaUpdateStockAdjustmentPayload = Partial<
+    Omit<CreateStockAdjustmentPayload, "stock_adjustment_rows">
+>;
+
+export interface KatanaStockAdjustmentRow extends KatanaStockAdjustmentRowInput {
+    id: number;
+}
+
+/**
+ * Full Stock Adjustment object returned by GET/POST/PATCH /stock_adjustments.
+ * Extends KatanaStockAdjustmentInput with server metadata and row identifiers.
+ */
+export interface KatanaStockAdjustment extends KatanaStockAdjustmentInput {
+    id: number;
+    stock_adjustment_number: string;
+    stock_adjustment_date: string;
+    stock_adjustment_rows: KatanaStockAdjustmentRow[];
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
+}
+
+// ==========================================
+// CONVERTERS & PAYLOAD HELPERS
+// ==========================================
+
+export const convertStockAdjustmentToCreatePayload = (
+    adjustment: KatanaStockAdjustmentInput
+): CreateStockAdjustmentPayload => {
+    const {
+        location_id,
+        stock_adjustment_number,
+        stock_adjustment_date,
+        reason,
+        additional_info,
+        stock_adjustment_rows,
+    } = adjustment;
+
+    // 1. Enforce minLength >= 1 for optional strings (prevent "" triggering 422 minLength)
+    const cleanAdjustmentNumber =
+        stock_adjustment_number && stock_adjustment_number.trim().length > 0
+            ? stock_adjustment_number
+            : undefined;
+
+    const cleanAdjustmentDate =
+        stock_adjustment_date && stock_adjustment_date.trim().length > 0
+            ? stock_adjustment_date
+            : undefined;
+
+    const cleanReason =
+        reason && reason.trim().length > 0 ? reason : undefined;
+
+    const cleanAdditionalInfo =
+        additional_info && additional_info.trim().length > 0
+            ? additional_info
+            : undefined;
+
+    // 2. Map and clean row items
+    const cleanRows: CreateStockAdjustmentRowPayload[] = stock_adjustment_rows.map(
+        (row) => {
+            const cleanTraceability =
+                row.traceability && row.traceability.length > 0
+                    ? row.traceability.map((t) => ({
+                        ...(t.batch_id !== undefined && { batch_id: t.batch_id }),
+                        ...(t.serial_number_id !== undefined && {
+                            serial_number_id: t.serial_number_id,
+                        }),
+                        ...(t.bin_location_id !== undefined && {
+                            bin_location_id: t.bin_location_id,
+                        }),
+                        quantity: String(t.quantity),
+                    }))
+                    : undefined;
+
+            const cleanBatchTransactions =
+                row.batch_transactions && row.batch_transactions.length > 0
+                    ? row.batch_transactions
+                    : undefined;
+
+            return {
+                variant_id: row.variant_id,
+                quantity: row.quantity,
+                ...(row.cost_per_unit !== undefined &&
+                    row.cost_per_unit !== null && { cost_per_unit: row.cost_per_unit }),
+                ...(cleanTraceability && { traceability: cleanTraceability }),
+                ...(cleanBatchTransactions && {
+                    batch_transactions: cleanBatchTransactions,
+                }),
+            };
+        }
+    );
+
+    return {
+        location_id,
+        stock_adjustment_rows: cleanRows,
+        ...(cleanAdjustmentNumber !== undefined && {
+            stock_adjustment_number: cleanAdjustmentNumber,
+        }),
+        ...(cleanAdjustmentDate !== undefined && {
+            stock_adjustment_date: cleanAdjustmentDate,
+        }),
+        ...(cleanReason !== undefined && { reason: cleanReason }),
+        ...(cleanAdditionalInfo !== undefined && {
+            additional_info: cleanAdditionalInfo,
+        }),
+    };
+};
+
+export const convertStockAdjustmentToUpdatePayload = (
+    adjustment: Partial<KatanaStockAdjustment>
+): KatanaUpdateStockAdjustmentPayload => {
+    const {
+        location_id,
+        stock_adjustment_number,
+        stock_adjustment_date,
+        reason,
+        additional_info,
+    } = adjustment;
+
+    const cleanAdjustmentNumber =
+        stock_adjustment_number && stock_adjustment_number.trim().length > 0
+            ? stock_adjustment_number
+            : undefined;
+
+    const cleanAdjustmentDate =
+        stock_adjustment_date && stock_adjustment_date.trim().length > 0
+            ? stock_adjustment_date
+            : undefined;
+
+    const cleanReason =
+        reason && reason.trim().length > 0 ? reason : undefined;
+
+    const cleanAdditionalInfo =
+        additional_info && additional_info.trim().length > 0
+            ? additional_info
+            : undefined;
+
+    return {
+        ...(location_id !== undefined && { location_id }),
+        ...(cleanAdjustmentNumber !== undefined && {
+            stock_adjustment_number: cleanAdjustmentNumber,
+        }),
+        ...(cleanAdjustmentDate !== undefined && {
+            stock_adjustment_date: cleanAdjustmentDate,
+        }),
+        ...(cleanReason !== undefined && { reason: cleanReason }),
+        ...(cleanAdditionalInfo !== undefined && {
+            additional_info: cleanAdditionalInfo,
+        }),
+    };
+};
+
+// ==========================================
 // 3. KATANA PURCHASE ORDER OBJECTS
 // Ref: https://developer.katanamrp.com/reference/the-purchase-order-object
 // ==========================================

@@ -7,6 +7,7 @@ import { ConfigOptionsEditor } from "./ConfigOptionEditor";
 import type { KatanaProduct, KatanaProductConfig } from "../../models/katana";
 
 
+
 interface EditProductProps {
     id: number;
     onSavingChange?: (isSaving: boolean) => void;
@@ -14,6 +15,24 @@ interface EditProductProps {
 }
 
 export const EditProduct = ({ id, onSavingChange }: EditProductProps) => {
+    const DEFAULT_PRODUCT_INPUT: KatanaProduct = {
+        id, // Fake ID (-1)
+        name: "",
+        uom: "pcs",
+        category_name: null,
+        default_supplier_id: null,
+        additional_info: null,
+        purchase_uom: null,
+        purchase_uom_conversion_rate: null,
+        is_sellable: true,
+        is_purchasable: true,
+        is_producible: false,
+        is_auto_assembly: false,
+        batch_tracked: false,
+        serial_tracked: false,
+        configs: [],
+        variants: [], // Safely initialized to empty array to prevent render crashes
+    };
     const [modalOpen, setModalOpen] = useState<boolean>(false)
     const [isSaving, setIsSaving] = useState(false);
     const [draftConfigs, setDraftConfigs] = useState<KatanaProductConfig[]>([]);
@@ -21,9 +40,10 @@ export const EditProduct = ({ id, onSavingChange }: EditProductProps) => {
     // Grab Contexts    
     const { products, editProduct, editVariant, refetchProducts } = useProductCatalog()
     const product = products.get(id);
-    const [formProduct, setproduct] = useState(product);
+    const [formProduct, setproduct] = useState<KatanaProduct>(
+        () => products.get(id) || DEFAULT_PRODUCT_INPUT
+    );
     const { inventory } = useInventoryCatalog()
-
 
     const handlePriceChange = async (variantIndex: number, newPrice: number) => {
         if (!formProduct) return;
@@ -45,7 +65,6 @@ export const EditProduct = ({ id, onSavingChange }: EditProductProps) => {
         await editVariant(updatedVariant);
 
     };
-
 
     // Product stuff
     const handleFieldChange = (field: keyof KatanaProduct, value: string) => {
@@ -72,18 +91,6 @@ export const EditProduct = ({ id, onSavingChange }: EditProductProps) => {
             onSavingChange?.(false);
         }
     };
-    // const debouncedFormProduct = useDebounce(formProduct, 500);
-
-    // Whenever debounced state updates, fire editProduct
-    // useEffect(() => {
-    //     if (debouncedFormProduct) {
-    //         console.log("Syncing changes to context/API:", debouncedFormProduct);
-    //         editProduct(debouncedFormProduct);
-    //     }
-    // }, [debouncedFormProduct, editProduct]);
-
-    // Re-sync local form state when context finishes refetching
-
     // Modal Stuff
     const handleSaveModal = async () => {
         if (!formProduct) return;

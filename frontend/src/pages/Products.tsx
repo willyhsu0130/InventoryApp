@@ -4,6 +4,8 @@ import { useProductCatalog } from "../hooks/useContexts";
 import { ProductsTable, } from "../components/products/ProductsTable";
 import { Plus } from "lucide-react";
 import { useError } from "../hooks/useError";
+import { EditModal } from "../components/EditModal";
+import { EditProduct } from "../components/products/EditProduct";
 
 export interface DisplayProductRow {
     id: number;              // Product ID
@@ -22,9 +24,22 @@ export const Products = () => {
     const { products, loading, refetchProducts } = useProductCatalog()
     const { errorMessage } = useError()
     const [searchTerm, setSearchTerm] = useState<string>("");
+    // selectedProductId: null = closed, -1 = create mode, >0 = edit mode
+    const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
+
     const handleCreateProduct = () => {
-        // TODO
-    }
+        setSelectedProductId(-1);
+        console.log("creating product")
+        
+    };
+
+    const handleCloseModal = () => {
+        // Prevent closing modal while background saving is active
+        if (isSaving) return;
+        setSelectedProductId(null);
+    };
+
 
     const productList = useMemo<DisplayProductRow[]>(() => {
         return Array.from(products.values()).flatMap((product) => {
@@ -56,8 +71,6 @@ export const Products = () => {
         });
     }, [products]);
 
-
-
     // Search filter across Product Name, SKU, Category, or Variant Spec
     const filteredProducts = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
@@ -74,8 +87,6 @@ export const Products = () => {
             );
         });
     }, [productList, searchTerm]);
-
-
 
     return (
         <div className="p-6 space-y-6 text-slate-100 flex flex-col h-full min-h-0" id="productsPage">
@@ -107,7 +118,7 @@ export const Products = () => {
 
                     {/* Plus Button */}
                     <button
-                        onClick={() => handleCreateProduct}
+                        onClick={() => handleCreateProduct()}
                         className="h-9 w-9 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition shrink-0 flex items-center justify-center"
                     >
                         <Plus width="14" height="14" />
@@ -130,9 +141,24 @@ export const Products = () => {
                     </div>
                 ) : (
                     /* Products Table */
-                    <ProductsTable items={filteredProducts} />
+                    <ProductsTable items={filteredProducts} onRowClick={(id) => setSelectedProductId(id)} />
                 )}
             </div>
+            <EditModal
+                isOpen={selectedProductId !== null}
+                title={selectedProductId === -1 ? "新增產品" : "編輯產品"}
+                onClose={handleCloseModal}
+                onSave={() => { }}
+                showSaveButton={false}
+                isSaving={isSaving}
+            >
+                {selectedProductId !== null && (
+                    <EditProduct
+                        id={selectedProductId === -1 ? -1 : selectedProductId}
+                        onSavingChange={setIsSaving}
+                    />
+                )}
+            </EditModal>
         </div>
     );
 };

@@ -3,23 +3,9 @@ import { katanaFetch } from "../lib/katanaFetch";
 import { KATANA_API_ROUTES } from "../lib/routes/routes";
 import { ProductContext } from "../context/ProductContext"; // Adjust path if needed
 import { InventoryTable } from "../components/inventory/InventoryTable";
+import type { KatanaInventoryItem } from "../models/katana";
+import { useError } from "../hooks/useError";
 
-// Structure matching Katana API Inventory shape
-export interface KatanaInventoryItem {
-    variant_id: number;
-    location_id: number;
-    safety_stock_level: string;
-    reorder_point: string;
-    average_cost: string;
-    value_in_stock: string;
-    quantity_in_stock: string;
-    quantity_committed: string;
-    quantity_expected: string;
-    quantity_missing_or_excess: string;
-    quantity_potential: string | null;
-    default_storage_bin: string | null;
-    archived_at: string | null;
-}
 
 export const Inventory = () => {
     // 1. Consume Product Context for names, SKUs, and variant details
@@ -27,13 +13,13 @@ export const Inventory = () => {
 
     const [items, setItems] = useState<KatanaInventoryItem[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const {  setErrorMessage } = useError()
     const [searchTerm, setSearchTerm] = useState<string>("");
 
     useEffect(() => {
         const fetchInventory = async () => {
             setLoading(true);
-            setError(null);
+
 
             const res = await katanaFetch<KatanaInventoryItem[]>(
                 KATANA_API_ROUTES.INVENTORY
@@ -42,13 +28,13 @@ export const Inventory = () => {
             if (res.success) {
                 setItems(res.data);
             } else {
-                setError(res.message || "Failed to load inventory data.");
+                setErrorMessage(res.message || "Failed to load inventory data.");
             }
             setLoading(false);
         };
 
         fetchInventory();
-    }, []);
+    }, [setErrorMessage]);
 
     // 2. Enhanced Filter: search across Variant ID, Product Name, SKU, and Variant Details
     const filteredItems = useMemo(() => {
@@ -93,20 +79,20 @@ export const Inventory = () => {
                     />
                 </div>
             </div>
-
+            <div className="flex gap-x-3">
+                <button>
+                    <p className="text-black">調整庫存</p>
+                </button>
+                <button>
+                    <p className="text-black">調整庫存</p>
+                </button>
+            </div>
             {/* Loading / Error States */}
             <div className="flex-1 w-full min-h-0" id="bottomContainer">
                 {isGlobalLoading ? (
                     <div className="flex justify-center items-center h-48 text-slate-400">
                         <p className="animate-pulse font-medium text-sm">
                             準備畫面中
-                        </p>
-                    </div>
-                ) : error || productCtx?.error ? (
-                    <div className="p-4 bg-red-950/40 border border-red-500/40 rounded-lg text-red-200 text-sm">
-                        <p className="font-semibold">Unable to display inventory</p>
-                        <p className="text-xs font-mono mt-1 text-red-300">
-                            {error || productCtx?.error}
                         </p>
                     </div>
                 ) : (
