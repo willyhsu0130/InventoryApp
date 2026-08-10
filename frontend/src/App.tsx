@@ -13,6 +13,7 @@ import { ProductProvider } from "./context/ProductProvider"
 import { InventoryProvider } from "./context/InventoryProvider"
 import { OrdersProvider } from "./context/orders/OrdersProvider"
 import { CustomersProvider } from "./context/customers/CustomersProvider"
+import { Customers } from "./pages/Customers"
 
 // Helper component to keep App.tsx clean
 const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/production" element={<Production />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/products" element={<Products />} />
+            <Route path="/customers" element={<Customers />} />
           </Route>
         </Routes>
       </BrowserRouter>
