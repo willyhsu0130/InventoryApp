@@ -33,7 +33,7 @@ export const navbarItems: NavbarItem[] = [
   },
   {
     icon: Factory,
-    link: "/production",
+    link: "/manufacture",
     text: "製造",
   },
   {

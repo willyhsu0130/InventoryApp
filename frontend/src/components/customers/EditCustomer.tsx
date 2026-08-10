@@ -12,15 +12,15 @@ export interface EditCustomerHandle {
 interface EditCustomerProps {
     id: number | -1;
     onSavingChange?: (isSaving: boolean) => void;
-    /** Called with the new customer id once a draft has been created. */
-    onCreated?: (customerId: number) => void;
+    /** Called with the customer id once created or updated. */
+    onSuccess?: (customerId: number) => void;
     ref?: React.Ref<EditCustomerHandle>;
 }
 
 export const EditCustomer = ({
     id,
     onSavingChange,
-    onCreated,
+    onSuccess,
     ref,
 }: EditCustomerProps) => {
     // -1 means "not in Katana yet": stays local until handleCreate (POST).
@@ -69,9 +69,10 @@ export const EditCustomer = ({
 
             if (isCreating) {
                 const created = await createCustomer(draftPayload);
-                onCreated?.(created.id);
+                onSuccess?.(created.id); // 👈 Passes the new ID
             } else {
-                await editCustomer(id, draftPayload);
+                const updated = await editCustomer(id, draftPayload);
+                onSuccess?.(updated.id); // 👈 Triggers modal close on edit success
             }
         } catch (err) {
             console.error("Failed to save customer:", err);

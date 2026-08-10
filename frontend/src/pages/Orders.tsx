@@ -20,7 +20,7 @@ type OrderTarget = { orderId: number } | null;
 
 export const Orders = () => {
     // 1. Consume orders catalog and product context
-    const { orders, loading, refetchOrders } = useOrdersCatalog();
+    const { orders, loading, refetchOrders, deleteOrder } = useOrdersCatalog();
     const productCtx = useContext(ProductContext);
 
     const { errorMessage } = useError();
@@ -116,6 +116,7 @@ export const Orders = () => {
                 onClose={() => setOrderTarget(null)}
                 isSaving={isSaving}
                 onSave={() => editOrderRef.current?.submit()}
+                onDelete={() => deleteOrder(orderTarget?.orderId)}
             >
                 {orderTarget !== null && (
                     <EditOrder

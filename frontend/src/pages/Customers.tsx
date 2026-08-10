@@ -114,9 +114,7 @@ export const Customers = () => {
                         onSavingChange={setIsSaving}
                         id={customerTarget.customerId}
                         ref={editCustomerRef}
-                        onCreated={() => {
-                            setCustomerTarget(null);
-                        }}
+                        onSuccess={() => setCustomerTarget(null)}
                     />
                 )}
             </EditModal>

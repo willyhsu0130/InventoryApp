@@ -51,28 +51,49 @@ export const CustomersProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     );
 
     // 3. UPDATE CUSTOMER (PATCH)
+    // Optimistic Update example for editCustomer
     const editCustomer = useCallback(
         async (id: number, draft: Partial<KatanaCustomerDraft>) => {
-            const payload = convertCustomerToUpdatePayload(draft);
-            const endpoint = KATANA_API_ROUTES.CUSTOMER_BY_ID
-                ? KATANA_API_ROUTES.CUSTOMER_BY_ID(id)
-                : `${KATANA_API_ROUTES.CUSTOMERS}/${id}`;
+            // 1. Capture snapshot for potential rollback
+            const previousCustomers = new Map(customers);
 
-            const res = await katanaFetch<KatanaCustomer>(endpoint, {
-                method: "PATCH",
-                body: JSON.stringify(payload),
+            // 2. OPTIMISTICALLY update state immediately
+            setCustomers((prev) => {
+                const next = new Map(prev);
+                const existing = next.get(id);
+                if (existing) {
+                    next.set(id, { ...existing, ...draft } as KatanaCustomer);
+                }
+                return next;
             });
 
-            if (!res.success || !res.data) {
+            try {
+                const payload = convertCustomerToUpdatePayload(draft);
+                const endpoint = KATANA_API_ROUTES.CUSTOMER_BY_ID
+                    ? KATANA_API_ROUTES.CUSTOMER_BY_ID(id)
+                    : `${KATANA_API_ROUTES.CUSTOMERS}/${id}`;
+
+                const res = await katanaFetch<KatanaCustomer>(endpoint, {
+                    method: "PATCH",
+                    body: JSON.stringify(payload),
+                });
+
+                if (!res.success || !res.data) {
+                    throw new Error("Failed to update customer.");
+                }
+
+                // Replace optimistic data with exact server payload
+                setCustomers((prev) => new Map(prev).set(res.data.id, res.data));
+                return res.data;
+            } catch (err) {
+                // 3. ROLLBACK on failure
+                setCustomers(previousCustomers);
                 const msg = "Failed to update customer.";
                 setErrorMessage(msg);
-                throw new Error(msg);
+                throw err;
             }
-
-            setCustomers((prev) => new Map(prev).set(res.data.id, res.data));
-            return res.data;
         },
-        [setErrorMessage]
+        [customers, setErrorMessage]
     );
 
     // 4. DELETE CUSTOMER (DELETE 204)

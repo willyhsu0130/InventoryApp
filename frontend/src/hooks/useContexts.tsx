@@ -7,6 +7,7 @@ import {
 import { InventoryContext } from "../context/InventoryContext";
 import { OrdersContext } from "@/context/orders/OrdersContext"
 import { CustomersContext } from "@/context/customers/CustomersContext";
+import { ManufactureContext } from "@/context/manufacture/ManufactureContext";
 
 export const useProductCatalog = () => {
     const context = useContext(ProductContext);
@@ -40,3 +41,13 @@ export const useCustomersCatalog = () => {
     }
     return context;
 }
+
+export const useManufactureCatalog = () => {
+    const context = useContext(ManufactureContext);
+    if (!context) {
+        throw new Error(
+            "useManufacturingCatalog must be used within a ManufactureProvider"
+        );
+    }
+    return context;
+};
