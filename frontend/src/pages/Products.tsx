@@ -20,7 +20,6 @@ export interface DisplayProductRow {
     categoryName?: string;   // Optional category name if present
 }
 
-
 export const Products = () => {
     const { products, loading, refetchProducts, deleteProduct } = useProductCatalog()
     const { errorMessage } = useError()

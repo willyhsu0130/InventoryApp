@@ -5,37 +5,50 @@ import { EditModal } from "../EditModal";
 import { katanaFetch } from "../../lib/katanaFetch";
 import { KATANA_API_ROUTES } from "../../lib/routes/routes";
 import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL } from "../../lib/styles";
-import { useProductCatalog } from "../../hooks/useContexts";
+import { useInventoryCatalog, useProductCatalog } from "../../hooks/useContexts";
 import {
     convertStockAdjustmentToCreatePayload,
+    type KatanaBatch,
     type KatanaInventoryItem,
     type KatanaLocation,
     type KatanaStockAdjustment,
     type KatanaStockAdjustmentRowInput,
+    type KatanaTraceabilityEntry,
 } from "../../models/katana";
+
+import { Calendar } from "@/components/ui/calendar"
+import { Button } from "@/components/ui/button"
+import { Calendar as CalendarIcon } from 'lucide-react';
+
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover"
+
+
 
 interface StockAdjustmentModalProps {
     onClose: () => void;
-    /** Called once Katana accepts the adjustment, so the page can refetch. */
     onAdjusted: () => void;
     items: KatanaInventoryItem[];
-    /** Pre-selects a single variant when opened from a table row. */
     initialVariantId?: number | null;
 }
 
-/**
- * One editable line. The user enters the counted total; Katana wants the
- * difference, so `quantity` is derived at submit time.
- */
+/** Sentinel used in the batch <select> to mean "create a new batch". */
+const NEW_BATCH_VALUE = "__new__";
+
 interface AdjustmentDraftRow {
     variantId: number;
-    /** Kept as raw text so the field can be emptied mid-typing. */
-    targetQuantity: string;
+    /** undefined = defaulted to current stock level */
+    targetQuantity?: string;
+    /** undefined = untraced, "new" = create a batch on save, number = existing batch id */
+    batchId?: number | "new";
+    /** Only used while batchId === "new" */
+    newBatchNumber?: string;
 }
 
 const todayInputValue = (): string => new Date().toISOString().slice(0, 10);
-
-/** Trims binary-float noise from a subtraction (e.g. 3.0000000000000004). */
 const roundQuantity = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 export const StockAdjustmentModal = ({
@@ -44,26 +57,29 @@ export const StockAdjustmentModal = ({
     items,
     initialVariantId,
 }: StockAdjustmentModalProps) => {
-    const { getVariantDetails } = useProductCatalog();
+    const { products, getVariantDetails } = useProductCatalog();
+    const { batch, createBatch } = useInventoryCatalog();
 
     const [locations, setLocations] = useState<KatanaLocation[]>([]);
     const [locationId, setLocationId] = useState<number | null>(
-        // Opened from a row: adopt that row's location so the numbers line up.
         initialVariantId != null
             ? items.find((item) => item.variant_id === initialVariantId)?.location_id ?? null
             : null
     );
+
+    // Default targetQuantity to undefined so it dynamically defaults to stock
     const [rows, setRows] = useState<AdjustmentDraftRow[]>(() =>
         initialVariantId != null
-            ? [{ variantId: initialVariantId, targetQuantity: "" }]
+            ? [{ variantId: initialVariantId, targetQuantity: undefined }]
             : []
     );
     const [reason, setReason] = useState("");
     const [adjustmentDate, setAdjustmentDate] = useState(todayInputValue);
+    const [adjustmentCalendarOpen, setAdjustmentCalendarOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
-    // location_id is required by the API, so resolve the list up front.
+    // Fetch locations on mount
     useEffect(() => {
         let isMounted = true;
 
@@ -97,18 +113,22 @@ export const StockAdjustmentModal = ({
         return byVariant;
     }, [items, locationId]);
 
-    // Seed each row with its current count so an untouched row means "no change".
-    // `items` is fixed while the modal is mounted, so this only fires on
-    // location switches and newly added rows.
-    useEffect(() => {
-        setRows((prev) =>
-            prev.map((row) =>
-                row.targetQuantity === ""
-                    ? { ...row, targetQuantity: String(stockByVariant.get(row.variantId) ?? 0) }
-                    : row
-            )
-        );
-    }, [stockByVariant]);
+    /** Existing batches, grouped by the variant they belong to. */
+    const batchesByVariant = useMemo(() => {
+        const byVariant = new Map<number, KatanaBatch[]>();
+        for (const b of batch.values()) {
+            const list = byVariant.get(b.variant_id) ?? [];
+            list.push(b);
+            byVariant.set(b.variant_id, list);
+        }
+        return byVariant;
+    }, [batch]);
+
+    /** Only batch-tracked products can have adjustment rows assigned to a batch. */
+    const isBatchTrackedVariant = (variantId: number): boolean => {
+        const details = getVariantDetails(variantId);
+        return products.get(details.productId)?.batch_tracked ?? false;
+    };
 
     const selectableVariants = useMemo(() => {
         const alreadyAdded = new Set(rows.map((row) => row.variantId));
@@ -121,19 +141,25 @@ export const StockAdjustmentModal = ({
             )
             .map((item) => {
                 const details = getVariantDetails(item.variant_id);
+                const product = products.get(details.productId);
+                const isParentVariant =
+                    (product?.configs?.length ?? 0) > 0 && !details.variant_details;
+
                 return {
                     variantId: item.variant_id,
                     label: details.variant_details
                         ? `${details.product_name} - ${details.variant_details}`
                         : details.product_name,
+                    isParentVariant,
                 };
             })
+            .filter((variant) => !variant.isParentVariant) // exclude the parent/default row
             .sort((a, b) => a.label.localeCompare(b.label));
-    }, [items, locationId, rows, getVariantDetails]);
+    }, [items, locationId, rows, getVariantDetails, products]);
 
     const handleAddRow = (variantId: number) => {
         setFormError(null);
-        setRows((prev) => [...prev, { variantId, targetQuantity: "" }]);
+        setRows((prev) => [...prev, { variantId, targetQuantity: undefined }]);
     };
 
     const handleRemoveRow = (variantId: number) => {
@@ -147,11 +173,44 @@ export const StockAdjustmentModal = ({
         );
     };
 
+    const handleBatchChange = (variantId: number, value: string) => {
+        setFormError(null);
+        setRows((prev) =>
+            prev.map((row) => {
+                if (row.variantId !== variantId) return row;
+
+                if (value === "") {
+                    return { ...row, batchId: undefined, newBatchNumber: undefined };
+                }
+                if (value === NEW_BATCH_VALUE) {
+                    return { ...row, batchId: "new" };
+                }
+                return { ...row, batchId: Number(value), newBatchNumber: undefined };
+            })
+        );
+    };
+
+    const handleNewBatchNumberChange = (variantId: number, newBatchNumber: string) => {
+        setFormError(null);
+        setRows((prev) =>
+            prev.map((row) => (row.variantId === variantId ? { ...row, newBatchNumber } : row))
+        );
+    };
+
+    /** Helper to resolve target quantity string or fallback to current stock. */
+    const getEffectiveQuantityString = (row: AdjustmentDraftRow): string => {
+        if (row.targetQuantity !== undefined) return row.targetQuantity;
+        return String(stockByVariant.get(row.variantId) ?? 0);
+    };
+
     /** Delta for a row, or null when the field is blank/unparseable. */
     const deltaFor = (row: AdjustmentDraftRow): number | null => {
-        if (row.targetQuantity.trim() === "") return null;
-        const target = Number(row.targetQuantity);
+        const rawStr = getEffectiveQuantityString(row);
+        if (rawStr.trim() === "") return null;
+
+        const target = Number(rawStr);
         if (Number.isNaN(target)) return null;
+
         return roundQuantity(target - (stockByVariant.get(row.variantId) ?? 0));
     };
 
@@ -161,13 +220,13 @@ export const StockAdjustmentModal = ({
             return;
         }
 
-        // Katana applies `quantity` as a delta: positive adds, negative removes.
         const adjustmentRows: KatanaStockAdjustmentRowInput[] = [];
 
         for (const row of rows) {
-            if (row.targetQuantity.trim() === "") continue;
+            const rawStr = getEffectiveQuantityString(row);
+            if (rawStr.trim() === "") continue;
 
-            const target = Number(row.targetQuantity);
+            const target = Number(rawStr);
             if (Number.isNaN(target)) {
                 setFormError("調整後數量必須是數字。");
                 return;
@@ -180,10 +239,42 @@ export const StockAdjustmentModal = ({
             const delta = roundQuantity(target - (stockByVariant.get(row.variantId) ?? 0));
             if (delta === 0) continue;
 
-            adjustmentRows.push({ variant_id: row.variantId, quantity: delta });
+            let traceability: KatanaTraceabilityEntry[] | undefined;
+
+            if (isBatchTrackedVariant(row.variantId) && row.batchId !== undefined) {
+                let resolvedBatchId: number;
+
+                if (row.batchId === "new") {
+                    const trimmed = row.newBatchNumber?.trim();
+                    if (!trimmed) {
+                        setFormError("請輸入新批次編號。");
+                        return;
+                    }
+                    try {
+                        const created = await createBatch({
+                            batch_number: trimmed,
+                            variant_id: row.variantId,
+                        });
+                        resolvedBatchId = created.id;
+                    } catch (err) {
+                        console.error("Failed to create batch:", err);
+                        setFormError(err instanceof Error ? err.message : "建立批次失敗。");
+                        return;
+                    }
+                } else {
+                    resolvedBatchId = row.batchId;
+                }
+
+                traceability = [{ batch_id: resolvedBatchId, quantity: String(delta) }];
+            }
+
+            adjustmentRows.push({
+                variant_id: row.variantId,
+                quantity: delta,
+                ...(traceability && { traceability }),
+            });
         }
 
-        // stock_adjustment_rows is minItems: 1 — an all-zero form is a no-op.
         if (adjustmentRows.length === 0) {
             setFormError("沒有任何數量變動。");
             return;
@@ -220,7 +311,6 @@ export const StockAdjustmentModal = ({
     };
 
     return (
-        // Mounted only while open, so every open starts from a clean form.
         <EditModal
             isOpen
             title="調整庫存"
@@ -278,6 +368,7 @@ export const StockAdjustmentModal = ({
                                 <th className="py-3 px-4 border-b border-slate-800">商品 / 規格</th>
                                 <th className="py-3 px-4 border-b border-slate-800 text-right">目前庫存</th>
                                 <th className="py-3 px-4 border-b border-slate-800 text-right">調整後數量</th>
+                                <th className="py-3 px-4 border-b border-slate-800">批次</th>
                                 <th className="py-3 px-4 border-b border-slate-800 text-right">變動</th>
                                 <th className="py-3 px-4 border-b border-slate-800 w-10" />
                             </tr>
@@ -285,7 +376,7 @@ export const StockAdjustmentModal = ({
                         <tbody className="font-mono text-xs">
                             {rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="py-8 text-center text-slate-500 font-sans">
+                                    <td colSpan={6} className="py-8 text-center text-slate-500 font-sans">
                                         請在下方新增要調整的商品。
                                     </td>
                                 </tr>
@@ -293,7 +384,10 @@ export const StockAdjustmentModal = ({
                                 rows.map((row) => {
                                     const details = getVariantDetails(row.variantId);
                                     const current = stockByVariant.get(row.variantId) ?? 0;
+                                    const effectiveQtyStr = getEffectiveQuantityString(row);
                                     const delta = deltaFor(row);
+                                    const batchTracked = isBatchTrackedVariant(row.variantId);
+                                    const variantBatches = batchesByVariant.get(row.variantId) ?? [];
 
                                     return (
                                         <tr key={row.variantId} className="border-b border-slate-800/40">
@@ -316,11 +410,66 @@ export const StockAdjustmentModal = ({
                                                     step="any"
                                                     min="0"
                                                     className="w-28 text-right bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-2 py-1 text-slate-100 focus:outline-none transition"
-                                                    value={row.targetQuantity}
+                                                    value={effectiveQtyStr}
                                                     onChange={(e) =>
                                                         handleTargetChange(row.variantId, e.target.value)
                                                     }
                                                 />
+                                            </td>
+                                            <td className="py-2.5 px-4">
+                                                {batchTracked ? (
+                                                    <div className="flex gap-x-3">
+                                                        <div className="flex flex-col gap-y-1">
+                                                            <select
+                                                                className="bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-2 py-1 text-slate-100 focus:outline-none transition"
+                                                                value={
+                                                                    row.batchId === "new"
+                                                                        ? NEW_BATCH_VALUE
+                                                                        : row.batchId ?? ""
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleBatchChange(row.variantId, e.target.value)
+                                                                }
+                                                            >
+                                                                {variantBatches.map((b) => (
+                                                                    <option key={b.id} value={b.id}>
+                                                                        {b.batch_number === "Unbatched" ? "不需要批次" : b.batch_number}
+                                                                    </option>
+                                                                ))}
+                                                                <option value={NEW_BATCH_VALUE}>+ 新增批次...</option>
+                                                            </select>
+                                                            {row.batchId === "new" && (
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="新批次編號"
+                                                                    className="bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-2 py-1 text-slate-100 focus:outline-none transition"
+                                                                    value={row.newBatchNumber ?? ""}
+                                                                    onChange={(e) =>
+                                                                        handleNewBatchNumberChange(
+                                                                            row.variantId,
+                                                                            e.target.value
+                                                                        )
+                                                                    }
+                                                                />
+                                                            )}
+
+                                                        </div>
+
+                                                        <div>
+                                                            {/* calendar */}
+                                                            <Popover>
+                                                                <PopoverTrigger render={<Button variant="secondary"><CalendarIcon /></Button>} />
+                                                                <PopoverContent className="">
+                                                                    <Calendar />
+                                                                </PopoverContent>
+                                                            </Popover>
+                                                        </div>
+
+                                                    </div>
+
+                                                ) : (
+                                                    <span className="text-slate-600">—</span>
+                                                )}
                                             </td>
                                             <td
                                                 className={`py-2.5 px-4 text-right font-medium ${delta === null || delta === 0

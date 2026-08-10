@@ -1,8 +1,7 @@
-import { useState, useMemo, useContext } from "react";
+import { useState, useMemo, useContext, useRef } from "react";
 import { Plus } from "lucide-react";
 import { ProductContext } from "../context/ProductContext";
 import { InventoryTable } from "../components/inventory/InventoryTable";
-import { StockAdjustmentModal } from "../components/inventory/StockAdjustmentModal";
 import { PageLayout } from "../components/PageLayout";
 import { useError } from "../hooks/useError";
 import {
@@ -13,6 +12,8 @@ import {
     TOOLBAR_BUTTON,
 } from "../lib/styles";
 import { useInventoryCatalog } from "../hooks/useContexts";
+import { EditModal } from "@/components/EditModal";
+import { StockAdjustment, type StockAdjustmentHandle } from "@/components/inventory/StockAdjustment";
 
 /** null = closed, undefined variant = blank adjustment, number = prefilled row. */
 type AdjustmentTarget = { variantId: number | null } | null;
@@ -25,7 +26,9 @@ export const Inventory = () => {
     const { errorMessage } = useError();
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [adjustmentTarget, setAdjustmentTarget] = useState<AdjustmentTarget>(null);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
 
+    const stockAdjustmentRef = useRef<StockAdjustmentHandle>(null);
     const inventoryList = useMemo(() => {
         return Array.from(inventory.values());
     }, [inventory]);
@@ -100,14 +103,26 @@ export const Inventory = () => {
                 />
             )}
 
-            {adjustmentTarget && (
-                <StockAdjustmentModal
+            <EditModal
+                showSaveButton={true}
+                title="調整庫存"
+                isOpen={adjustmentTarget !== null}
+                onClose={() => setAdjustmentTarget(null)}
+                isSaving={isSaving}
+                onSave={() => stockAdjustmentRef.current?.submit()}
+
+            >
+                <StockAdjustment
+                    onSavingChange={setIsSaving}
                     items={inventoryList}
-                    initialVariantId={adjustmentTarget.variantId}
-                    onClose={() => setAdjustmentTarget(null)}
-                    onAdjusted={refetchInventory}
+                    ref={stockAdjustmentRef}
+                    onSuccess={async () => {
+                        await refetchInventory(); // 1. Refresh table data
+                        setAdjustmentTarget(null); // 2. Close the modal!
+                    }}
+                    initialVariantId={adjustmentTarget?.variantId}
                 />
-            )}
+            </EditModal>
         </PageLayout>
     );
 };

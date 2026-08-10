@@ -1,4 +1,3 @@
-
 import { useImperativeHandle, useState } from "react";
 import { useInventoryCatalog, useProductCatalog } from "@/hooks/useContexts";
 import { EditModal } from "../EditModal"
@@ -48,6 +47,7 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         () => products.get(id) ?? createEmptyProductDraft()
     );
     const { inventory } = useInventoryCatalog()
+
     /**
      * Apply a change to one variant row, then persist it if that row already
      * exists in Katana. Unsaved rows have no id to PATCH against.
@@ -75,26 +75,43 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         await editVariant({ ...updatedVariant, id: variantId });
     };
 
-    // Product stuff
-    const handleFieldChange = (field: keyof KatanaProductDraft, value: string) => {
+    // Product stuff — accepts string (text inputs) or boolean (radio/checkbox flags)
+    const handleFieldChange = (
+        field: keyof KatanaProductDraft,
+        value: string | boolean
+    ) => {
         setFormError(null);
         setproduct((prev) => ({ ...prev, [field]: value }));
     };
 
-    const handleCommit = async () => {
+    /**
+     * Single source of truth for "does this product need a PATCH."
+     * Accepts an optional patch so callers (radio group, checkboxes) can commit
+     * a value the instant it changes, without waiting on a stale `formProduct`
+     * closure from a previous setState.
+     */
+    const commitProductPatch = async (patch: Partial<KatanaProductDraft> = {}) => {
         // Drafts have nothing to PATCH — they are saved by the modal's save button.
         if (isCreating || !product) return;
 
+        const updated = { ...formProduct, ...patch };
+        if (Object.keys(patch).length > 0) {
+            setproduct(updated);
+        }
+
         // Check if top-level fields actually changed before firing API call
         const hasChanges =
-            formProduct.name !== product.name ||
-            formProduct.uom !== product.uom;
-        // Add other fields here: || formProduct.sku !== product.sku, etc.
+            updated.name !== product.name ||
+            updated.uom !== product.uom ||
+            updated.batch_tracked !== product.batch_tracked ||
+            updated.serial_tracked !== product.serial_tracked;
+        // Add other fields here as they're added to the form.
 
         if (!hasChanges) return;
+
         onSavingChange?.(true);
         try {
-            await editProduct(formProduct);
+            await editProduct(updated);
             await refetchProducts();
         } catch (err) {
             console.error("Failed auto-save:", err);
@@ -102,6 +119,9 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
             onSavingChange?.(false);
         }
     };
+
+    // Kept for the text inputs' onBlur — just re-diffs current formProduct.
+    const handleCommit = () => commitProductPatch();
 
     /** Validates against the constraints POST /products enforces. */
     const validateDraft = (draft: KatanaProductDraft): string | null => {
@@ -203,6 +223,16 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         }
     };
 
+    // Batch/date tracking radio group — mutually exclusive with serial tracking.
+    const handleTrackingModeChange = (val: string) => {
+        const isBatch = val === "batch";
+        setFormError(null);
+        commitProductPatch({
+            batch_tracked: isBatch,
+            serial_tracked: isBatch ? formProduct.serial_tracked : false,
+        });
+    };
+
     const variants = formProduct.variants
 
     return (
@@ -230,57 +260,61 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
 
             {/* Edit Products*/}
             <div className="h-2/3 gap-y-3">
-    <div className="grid grid-cols-2 gap-4">
-        {/* Field 1: Name */}
-        <div className="flex flex-col gap-y-1 col-span-2">
-            <label className="text-xs text-slate-400 font-sans">產品名稱</label>
-            <input
-                type="text"
-                value={formProduct.name}
-                onChange={(e) => handleFieldChange("name", e.target.value)}
-                onBlur={handleCommit}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                placeholder="名稱"
-                className="text-xl bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-bold"
-            />
-        </div>
+                <div className="grid grid-cols-2 gap-4">
+                    {/* Field 1: Name */}
+                    <div className="flex flex-col gap-y-1 col-span-2">
+                        <label className="text-xs text-slate-400 font-sans">產品名稱</label>
+                        <input
+                            type="text"
+                            value={formProduct.name}
+                            onChange={(e) => handleFieldChange("name", e.target.value)}
+                            onBlur={handleCommit}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            }}
+                            placeholder="名稱"
+                            className="text-xl bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-bold"
+                        />
+                    </div>
 
-        {/* Field 2a: Unit of Measure (UOM) — its own grid cell */}
-        <div className="flex flex-col gap-y-1">
-            <label className="text-xs text-slate-400 font-sans">單位 (UOM)</label>
-            <input
-                type="text"
-                maxLength={UOM_MAX_LENGTH}
-                value={formProduct.uom ?? ""}
-                onChange={(e) => handleFieldChange("uom", e.target.value)}
-                onBlur={handleCommit}
-                onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                placeholder="例如: pcs, box"
-                className="bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-mono text-sm"
-            />
-        </div>
+                    {/* Field 2a: Unit of Measure (UOM) — its own grid cell */}
+                    <div className="flex flex-col gap-y-1">
+                        <label className="text-xs text-slate-400 font-sans">單位 (UOM)</label>
+                        <input
+                            type="text"
+                            maxLength={UOM_MAX_LENGTH}
+                            value={formProduct.uom ?? ""}
+                            onChange={(e) => handleFieldChange("uom", e.target.value)}
+                            onBlur={handleCommit}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            }}
+                            placeholder="例如: pcs, box"
+                            className="bg-transparent border-b border-slate-700 focus:border-slate-500 focus:outline-none px-1 py-0.5 text-slate-100 font-mono text-sm"
+                        />
+                    </div>
 
-        {/* Field 2b: Category radio group — its own grid cell */}
-        <div className="flex items-end">
-            <RadioGroup className="flex flex-row space-x-4" defaultValue="option-1">
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem id="h1" value="option-1" />
-                    <Label htmlFor="h1">不需要分類</Label>
+                    {/* Field 2b: Tracking mode radio group — its own grid cell */}
+                    <div className="flex items-end">
+                        <RadioGroup
+                            className="flex flex-row space-x-4"
+                            value={formProduct.batch_tracked ? "batch" : "none"}
+                            onValueChange={handleTrackingModeChange}
+                        >
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem id="h1" value="none" />
+                                <Label htmlFor="h1">不需要分類</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem id="h2" value="batch" />
+                                <Label htmlFor="h2">以批次/日期分類</Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+
+                    {/* Next field pairs will naturally continue the 2-column pattern */}
                 </div>
-                <div className="flex items-center space-x-2">
-                    <RadioGroupItem id="h2" value="option-2" />
-                    <Label htmlFor="h2">以批次/日期分類</Label>
-                </div>
-            </RadioGroup>
-        </div>
-
-        {/* Next field pairs will naturally continue the 2-column pattern */}
-    </div>
-</div>
+            </div>
             {/* Edit Variants*/}
             <div className="h-1/3">
                 <div className="mb-5">

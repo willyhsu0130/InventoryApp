@@ -596,7 +596,7 @@ export interface KatanaBatchTransaction {
 export interface KatanaStockAdjustmentRowInput {
     variant_id: number;
     quantity: number;
-    cost_per_unit?: number | null;
+    cost_per_unit?: number ;
     traceability?: KatanaTraceabilityEntry[];
     /** @deprecated Use traceability */
     batch_transactions?: KatanaBatchTransaction[];
@@ -609,6 +609,34 @@ export interface KatanaStockAdjustmentInput {
     reason?: string | null;
     additional_info?: string | null;
     stock_adjustment_rows: KatanaStockAdjustmentRowInput[];
+}
+
+export interface KatanaBatch {
+    id: number;
+    batch_number: string;
+    variant_id: number;
+    expiration_date?: string | null;
+    batch_created_date?: string | null;
+    batch_barcode?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface KatanaCreateBatchInput {
+    batch_number: string;
+    variant_id: number;
+    expiration_date?: string;
+    batch_created_date?: string;
+    /** minLength: 3, maxLength: 40 */
+    batch_barcode?: string | null;
+}
+
+export interface KatanaUpdateBatchInput {
+    batch_number?: string;
+    expiration_date?: string;
+    batch_created_date?: string;
+    /** minLength: 3, maxLength: 40 */
+    batch_barcode?: string | null;
 }
 
 /**

@@ -17,7 +17,8 @@ export const KATANA_API_ROUTES = {
   // Inventory & Batches
   INVENTORY: '/inventory',
   BATCHES: '/batches',
-  BATCH_BY_ID: (id: number | string) => `/batches/${id}`,
+  BATCH_STOCKS: '/batch_stocks',
+  BATCH_BY_ID: (id: number | string) => `/batches_stocks/${id}`,
   STOCK_ADJUSTMENTS: '/stock_adjustments',
   STOCK_TRANSFERS: '/stock_transfers',
 
