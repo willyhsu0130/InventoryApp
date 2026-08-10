@@ -91,21 +91,21 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
      * closure from a previous setState.
      */
     const commitProductPatch = async (patch: Partial<KatanaProductDraft> = {}) => {
-        // Drafts have nothing to PATCH — they are saved by the modal's save button.
-        if (isCreating || !product) return;
-
+        // 1. Always update local form state first (works for both drafts and existing products)
         const updated = { ...formProduct, ...patch };
         if (Object.keys(patch).length > 0) {
             setproduct(updated);
         }
 
-        // Check if top-level fields actually changed before firing API call
+        // 2. Drafts don't send API requests yet; they wait for the submit handle
+        if (isCreating || !product) return;
+
+        // 3. Check if top-level fields actually changed before firing API call
         const hasChanges =
             updated.name !== product.name ||
             updated.uom !== product.uom ||
             updated.batch_tracked !== product.batch_tracked ||
             updated.serial_tracked !== product.serial_tracked;
-        // Add other fields here as they're added to the form.
 
         if (!hasChanges) return;
 

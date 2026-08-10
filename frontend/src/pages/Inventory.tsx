@@ -117,7 +117,6 @@ export const Inventory = () => {
                     items={inventoryList}
                     ref={stockAdjustmentRef}
                     onSuccess={async () => {
-                        await refetchInventory(); // 1. Refresh table data
                         setAdjustmentTarget(null); // 2. Close the modal!
                     }}
                     initialVariantId={adjustmentTarget?.variantId}
