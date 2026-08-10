@@ -4,6 +4,8 @@ import {
   Boxes,
   Factory,
   Settings,
+  User,
+  Fish,
   type LucideIcon
 } from "lucide-react"
 
@@ -35,9 +37,14 @@ export const navbarItems: NavbarItem[] = [
     text: "製造",
   },
   {
-    icon: Factory,
+    icon: Fish,
     link: "/products",
     text: "產品",
+  },
+  {
+    icon: User,
+    link: "/customers",
+    text: "客戶",
   },
   {
     icon: Settings,

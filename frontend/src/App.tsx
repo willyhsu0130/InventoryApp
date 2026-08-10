@@ -7,27 +7,44 @@ import { Inventory } from "./pages/Inventory"
 import { Production } from "./pages/Production"
 import { Settings } from "./pages/Settings"
 import { Products } from "./pages/Products"
+
+import { ErrorProvider } from "./context/error/ErrorProvider"
 import { ProductProvider } from "./context/ProductProvider"
 import { InventoryProvider } from "./context/InventoryProvider"
-import { ErrorProvider } from "./context/ErrorProvider"
+import { OrdersProvider } from "./context/orders/OrdersProvider"
+import { CustomersProvider } from "./context/customers/CustomersProvider"
+
+// Helper component to keep App.tsx clean
+const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ErrorProvider>
+    <CustomersProvider>
+      <ProductProvider>
+        <InventoryProvider>
+          <OrdersProvider>
+            {children}
+          </OrdersProvider>
+        </InventoryProvider>
+      </ProductProvider>
+    </CustomersProvider>
+  </ErrorProvider>
+);
 
 export default function App() {
   return (
-    <ErrorProvider>
+    <AppProviders>
       <BrowserRouter>
         <Routes>
-          {/* Parent Route using MainLayout */}
           <Route element={<MainLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/orders" element={<Orders />} />
-            <Route path="/inventory" element={<InventoryProvider><ProductProvider><Inventory /></ProductProvider></InventoryProvider>} />
+            <Route path="/inventory" element={<Inventory />} />
             <Route path="/production" element={<Production />} />
             <Route path="/settings" element={<Settings />} />
-            <Route path="/products" element={<InventoryProvider><ProductProvider><Products /></ProductProvider></InventoryProvider>} />
+            <Route path="/products" element={<Products />} />
           </Route>
         </Routes>
       </BrowserRouter>
-    </ErrorProvider>
+    </AppProviders>
   )
 }

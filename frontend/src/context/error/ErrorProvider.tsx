@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { ErrorContext } from "./ErrorContext";
+import { ErrorContext } from "@/context/error/ErrorContext";
 
 export const ErrorProvider = ({ children }: { children: ReactNode }) => {
 
