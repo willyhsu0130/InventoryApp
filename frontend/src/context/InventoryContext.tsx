@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { CreateStockAdjustmentPayload, KatanaBatch, KatanaCreateBatchInput, KatanaInventoryItem, KatanaStockAdjustment } from "../models/katana";
+import type { CreateStockAdjustmentPayload, KatanaBatch, KatanaCreateBatchInput, KatanaInventoryItem, KatanaStockAdjustment } from "../models/katana/katana";
 interface InventoryContextType {
     inventory: Map<number, KatanaInventoryItem>
     loading: boolean

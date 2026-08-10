@@ -1,5 +1,5 @@
 // src/components/customers/CustomersTable.tsx
-import type { KatanaCustomer } from "@/models/katana";
+import type { KatanaCustomer } from "@/models/katana/customers"
 import { DataTable, type Column } from "../DataTable";
 import { format } from "date-fns";
 

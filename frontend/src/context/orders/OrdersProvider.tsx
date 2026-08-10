@@ -1,4 +1,4 @@
-import { convertSalesOrderToCreatePayload, convertSalesOrderToUpdatePayload, type KatanaSalesOrder, type KatanaSalesOrderDraft } from "@/models/katana";
+import { convertSalesOrderToCreatePayload, convertSalesOrderToUpdatePayload, type KatanaSalesOrder, type KatanaSalesOrderDraft } from "@/models/katana/salesOrder";
 import { useCallback, useEffect, useState } from "react";
 import { OrdersContext } from "@/context/orders/OrdersContext";
 import { katanaFetch } from "@/lib/katanaFetch";

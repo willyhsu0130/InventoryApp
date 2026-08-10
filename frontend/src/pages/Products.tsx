@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useError } from "../hooks/useError";
 import { EditModal } from "../components/EditModal";
 import { EditProduct, type EditProductHandle } from "../components/products/EditProduct";
-import { UNSAVED_PRODUCT_ID } from "../models/katana";
+import { UNSAVED_PRODUCT_ID } from "@/models/katana/productVariant";
 
 export interface DisplayProductRow {
     id: number;              // Product ID

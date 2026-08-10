@@ -14,7 +14,7 @@ import {
 import { useCustomersCatalog } from "@/hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { EditCustomer, type EditCustomerHandle } from "@/components/customers/EditCustomer";
-import type { KatanaCustomer } from "@/models/katana";
+import type { KatanaCustomer } from "@/models/katana/customers";
 
 /** null = closed, -1 = new customer creation, number = editing customer id */
 type CustomerTarget = { customerId: number } | null;

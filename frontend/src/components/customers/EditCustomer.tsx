@@ -2,7 +2,7 @@
 import { useImperativeHandle, useState } from "react";
 import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL } from "@/lib/styles";
 import { useCustomersCatalog } from "@/hooks/useContexts";
-import type { KatanaCustomerDraft } from "@/models/katana";
+import type { KatanaCustomerDraft } from "@/models/katana/customers";
 
 export interface EditCustomerHandle {
     /** Persists an unsaved draft. No-op once the customer exists. */

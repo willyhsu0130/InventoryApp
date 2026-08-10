@@ -8,12 +8,16 @@ import {
     useProductCatalog,
     useCustomersCatalog,
 } from "@/hooks/useContexts";
-import type { KatanaCustomer, KatanaLocation, KatanaSalesOrderRow } from "@/models/katana";
+
+import type { KatanaCustomer } from "@/models/katana/customers";
 
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
+import type { KatanaLocation } from "@/models/katana/common";
+import type { KatanaSalesOrderRow } from "@/models/katana/salesOrder";
+import type { KatanaVariant } from "@/models/katana/productVariant";
 
 export interface EditOrderHandle {
     /** Persists an unsaved draft. No-op once the order exists. */
@@ -116,7 +120,8 @@ export const EditOrder = ({
         const list: Array<{ variantId: number; label: string; price: number }> = [];
 
         products.forEach((product) => {
-            product.variants?.forEach((variant) => {
+            const variants = product?.variants
+            variants?.forEach((variant: KatanaVariant) => {
                 const details = getVariantDetails(variant.id);
                 const label = details.variant_details
                     ? `${details.product_name} - ${details.variant_details}`

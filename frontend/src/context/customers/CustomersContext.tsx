@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { KatanaCustomer, KatanaCustomerDraft } from "@/models/katana";
+import type { KatanaCustomer, KatanaCustomerDraft } from "@/models/katana/katana";
 
 export interface CustomersContextType {
     customers: Map<number, KatanaCustomer>;

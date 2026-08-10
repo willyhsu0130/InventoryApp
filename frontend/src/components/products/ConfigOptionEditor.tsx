@@ -1,7 +1,7 @@
 // src/components/ConfigManager.tsx
 import { useState } from "react";
 import { X, Plus, Check } from "lucide-react";
-import type { KatanaProductConfig } from "../../models/katana";
+import type { KatanaProductConfig } from "../../models/katana/katana";
 
 interface ConfigOptionsEditorProps {
     configs: KatanaProductConfig[];

@@ -14,7 +14,7 @@ import {
     type KatanaStockAdjustment,
     type KatanaStockAdjustmentRowInput,
     type KatanaTraceabilityEntry,
-} from "../../models/katana";
+} from "../../models/katana/katana";
 
 import { Calendar } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button"

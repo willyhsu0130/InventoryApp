@@ -9,7 +9,7 @@ import {
     type KatanaProduct,
     type KatanaProductDraft,
     type KatanaVariant,
-} from "../models/katana";
+} from "../models/katana/productVariant";
 import { KATANA_API_ROUTES } from "../lib/routes/routes";
 import { useError } from "../hooks/useError";
 

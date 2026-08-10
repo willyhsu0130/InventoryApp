@@ -1,5 +1,5 @@
 // src/components/orders/OrdersTable.tsx
-import type { KatanaSalesOrder, KatanaSalesOrderStatus } from "../../models/katana";
+import type { KatanaSalesOrder, KatanaSalesOrderStatus } from "../../models/katana/katana";
 import { DataTable, type Column } from "../DataTable";
 import { format } from "date-fns";
 

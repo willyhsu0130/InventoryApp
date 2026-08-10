@@ -5,14 +5,8 @@ import { InlineInput } from "../InlineInput";
 import { ConfigOptionsEditor } from "./ConfigOptionEditor";
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import {
-    createEmptyProductDraft,
-    isUnsavedProduct,
-    syncDraftVariantsToConfigs,
-    type KatanaProductConfig,
-    type KatanaProductDraft,
-    type KatanaProductDraftVariant,
-} from "../../models/katana";
+import { createEmptyProductDraft, isUnsavedProduct, syncDraftVariantsToConfigs, type KatanaProductConfig, type KatanaProductDraft, type KatanaProductDraftVariant } from "@/models/katana/productVariant";
+
 
 /** Max length Katana enforces on `uom` and `purchase_uom`. */
 const UOM_MAX_LENGTH = 7;

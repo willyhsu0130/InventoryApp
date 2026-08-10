@@ -4,7 +4,7 @@ import type {
     KatanaProductDraft,
     KatanaProductDraftVariant,
     KatanaVariant,
-} from "../models/katana";
+} from "../models/katana/katana";
 
 /** A variant that already exists in Katana, so it can be PATCHed by id. */
 export type SavedDraftVariant = KatanaProductDraftVariant & { id: number };

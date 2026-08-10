@@ -6,7 +6,7 @@ import {
     type KatanaBatch,
     type KatanaCreateBatchInput,
     type KatanaInventoryItem
-} from "../models/katana";
+} from "../models/katana/inventory";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { katanaFetch } from "../lib/katanaFetch";
 import { KATANA_API_ROUTES } from "../lib/routes/routes";
