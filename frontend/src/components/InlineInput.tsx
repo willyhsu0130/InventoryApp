@@ -60,7 +60,7 @@ export const InlineInput = <T extends string | number>({
                 onFocus={(e) => e.target.select()}
                 type={type}
                 step={type === "number" ? "0.01" : undefined}
-                className="w-full text-center px-2 py-1 rounded bg-slate-900 border border-indigo-500 text-slate-100 outline-none"
+                className="w-full text-center px-2 py-1 rounded bg-background border border-input text-foreground outline-none focus:ring-2 focus:ring-ring/30"
                 value={tempValue}
                 onChange={(e) => setTempValue(e.target.value)}
                 onBlur={handleBlur}

@@ -4,6 +4,7 @@ import {
     type KatanaStockAdjustment,
     type CreateStockAdjustmentPayload,
     type KatanaBatch,
+    type KatanaBatchStock,
     type KatanaCreateBatchInput,
     type KatanaInventoryItem
 } from "../models/katana/inventory";
@@ -98,7 +99,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const loadInitialData = async () => {
             const [inventoryRes, batchRes] = await Promise.all([
                 katanaFetch<KatanaInventoryItem[]>(KATANA_API_ROUTES.INVENTORY),
-                katanaFetch<KatanaBatch[]>(KATANA_API_ROUTES.BATCH_STOCKS)
+                katanaFetch<KatanaBatchStock[]>(KATANA_API_ROUTES.BATCH_STOCKS)
             ]);
 
             if (!isMounted) return;
@@ -113,7 +114,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
             if (batchRes.success && Array.isArray(batchRes.data)) {
                 const bMap = new Map<number, KatanaBatch>();
-                batchRes.data.forEach((b) => bMap.set(b.id, b));
+                batchRes.data.forEach((stock) => {
+                    bMap.set(stock.batch_id, {
+                        ...stock,
+                        id: stock.batch_id,
+                    });
+                });
                 setBatch(bMap);
             }
 

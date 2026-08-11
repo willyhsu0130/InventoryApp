@@ -9,11 +9,12 @@ import {
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
-    TOOLBAR_BUTTON,
 } from "../lib/styles";
 import { useOrdersCatalog } from "../hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { EditOrder, type EditOrderHandle } from "@/components/orders/EditOrder";
+import { Button } from "@/components/ui/button";
+import { RefreshButton } from "@/components/RefreshButton";
 
 /** null = closed, undefined orderId = new order creation, number = prefilled order id for editing */
 type OrderTarget = { orderId: number } | null;
@@ -80,17 +81,15 @@ export const Orders = () => {
             title="訂單"
             actions={
                 <>
-                    <button
+                    <Button
                         onClick={() => setOrderTarget({ orderId: -1 })}
                         className={PRIMARY_BUTTON}
                     >
                         <Plus width="14" height="14" />
                         新增訂單
-                    </button>
+                    </Button>
 
-                    <button onClick={() => refetchOrders()} className={TOOLBAR_BUTTON}>
-                        重新整理訂單
-                    </button>
+                    <RefreshButton label="重新整理訂單" onClick={() => refetchOrders()} />
 
                     <div className="w-full sm:w-80">
                         <input

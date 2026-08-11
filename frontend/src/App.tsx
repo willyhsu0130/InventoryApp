@@ -4,6 +4,7 @@ import MainLayout from "./MainLayout"
 import { Dashboard } from "./pages/Dashboard"
 import { Orders } from "./pages/Orders"
 import { Inventory } from "./pages/Inventory"
+import { InventoryBatches } from "./pages/InventoryBatches"
 import { Manufacture } from "./pages/Manufacture"
 import { Settings } from "./pages/Settings"
 import { Products } from "./pages/Products"
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/orders" element={<Orders />} />
             <Route path="/inventory" element={<Inventory />} />
+            <Route path="/inventory/batches" element={<InventoryBatches />} />
             <Route path="/manufacture" element={<Manufacture />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/products" element={<Products />} />

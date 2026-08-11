@@ -1,110 +1,107 @@
-import { InventoryTable } from "@/components/inventory/InventoryTable";
-import { OrdersTable } from "@/components/orders/OrdersTable";
-import { ManufactureTable } from "@/components/manufacture/ManufactureTable";
-import {
-    useInventoryCatalog,
-    useOrdersCatalog,
-    useManufactureCatalog,
-} from "@/hooks/useContexts";
-import { useMemo } from "react";
-import { Link } from "react-router";
+import { Boxes, Factory, ShoppingCart, ArrowUpRight } from "lucide-react"
+import { Link } from "react-router"
+import { useMemo } from "react"
+import type { ReactNode } from "react"
+
+import { InventoryTable } from "@/components/inventory/InventoryTable"
+import { OrdersTable } from "@/components/orders/OrdersTable"
+import { ManufactureTable } from "@/components/manufacture/ManufactureTable"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useInventoryCatalog, useOrdersCatalog, useManufactureCatalog } from "@/hooks/useContexts"
+
+const sectionLinks = {
+    orders: "/orders",
+    inventory: "/inventory",
+    manufacture: "/manufacture",
+} as const
 
 export const Dashboard = () => {
-    const { inventory } = useInventoryCatalog();
-    const { orders } = useOrdersCatalog();
-    const { manufactureOrders } = useManufactureCatalog();
+    const { inventory } = useInventoryCatalog()
+    const { orders } = useOrdersCatalog()
+    const { manufactureOrders } = useManufactureCatalog()
 
-    const inventoryList = useMemo(() => Array.from(inventory.values()), [inventory]);
-    const ordersList = useMemo(() => Array.from(orders.values()), [orders]);
-    const manufactureList = useMemo(
-        () => Array.from(manufactureOrders.values()),
-        [manufactureOrders]
-    );
+    const inventoryList = useMemo(() => Array.from(inventory.values()), [inventory])
+    const ordersList = useMemo(() => Array.from(orders.values()), [orders])
+    const manufactureList = useMemo(() => Array.from(manufactureOrders.values()), [manufactureOrders])
+
+    const stats = [
+        { label: "訂單", value: ordersList.length, description: "目前銷售訂單", icon: ShoppingCart },
+        { label: "庫存項目", value: inventoryList.length, description: "正在追蹤的品項", icon: Boxes },
+        { label: "製造工單", value: manufactureList.length, description: "目前製造排程", icon: Factory },
+    ]
 
     return (
-        /* Full height container with a 2-column grid */
-        <div className="w-full h-[calc(100vh-4rem)] p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-
-            {/* LEFT COLUMN: 1/3 top (Summary), 2/3 bottom (Orders) */}
-            <div className="flex flex-col gap-4 h-full min-h-0">
-                {/* 1/3 Height Card - Summary Placeholder */}
-                <div className="h-1/3 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
-                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                        快速概覽
-                    </h3>
-                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-hidden">
-                        {/* 1/3 Content */}
-                        <div>
-
-                        </div>
-                        <div>
-
-                        </div>
-                        <div>
-
-                        </div>
-                    </div>
+        <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
+            <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 md:p-6 lg:p-8">
+                <div>
+                    <h1 className="text-2xl font-semibold tracking-tight">快速概覽</h1>
+                    <p className="text-sm text-muted-foreground">查看庫存、訂單與製造作業的即時狀態。</p>
                 </div>
 
-                {/* 2/3 Height Card - Orders Table */}
-                <div className="h-2/3 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                            訂單總覽
-                        </h3>
-                        <Link
-                            to="/orders"
-                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
-                        >
-                            查看全部 →
-                        </Link>
-                    </div>
-                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-y-auto">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {stats.map((stat) => {
+                        const Icon = stat.icon
+                        return (
+                            <Card key={stat.label}>
+                                <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+                                    <CardDescription>{stat.label}</CardDescription>
+                                    <Icon className="size-4 text-muted-foreground" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">{stat.value}</div>
+                                    <p className="text-xs text-muted-foreground">{stat.description}</p>
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                    <DashboardSection title="訂單總覽" description="最近的銷售訂單" href={sectionLinks.orders}>
                         <OrdersTable items={ordersList} />
-                    </div>
-                </div>
-            </div>
-
-            {/* RIGHT COLUMN: 1/2 top (Inventory), 1/2 bottom (Manufacture) */}
-            <div className="flex flex-col gap-4 h-full min-h-0">
-                {/* 1/2 Height Card - Inventory Table */}
-                <div className="h-1/2 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                            庫存預警
-                        </h3>
-                        <Link
-                            to="/inventory"
-                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
-                        >
-                            查看全部 →
-                        </Link>
-                    </div>
-
-                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-y-auto">
+                    </DashboardSection>
+                    <DashboardSection title="庫存預警" description="目前庫存狀態" href={sectionLinks.inventory}>
                         <InventoryTable items={inventoryList} />
-                    </div>
+                    </DashboardSection>
                 </div>
 
-                {/* 1/2 Height Card - Manufacture Table */}
-                <div className="h-1/2 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                            製造
-                        </h3>
-                        <Link
-                            to="/manufacture"
-                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
-                        >
-                            查看全部 →
-                        </Link>
-                    </div>
-                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-y-auto">
-                        <ManufactureTable items={manufactureList} />
-                    </div>
-                </div>
+                <DashboardSection title="製造" description="目前製造排程" href={sectionLinks.manufacture}>
+                    <ManufactureTable items={manufactureList} />
+                </DashboardSection>
             </div>
-
         </div>
-    );
-};
+    )
+}
+
+function DashboardSection({
+    title,
+    description,
+    href,
+    children,
+}: {
+    title: string
+    description: string
+    href: string
+    children: ReactNode
+}) {
+    return (
+        <Card className="flex h-[30rem] min-w-0 flex-col overflow-hidden">
+            <CardHeader className="flex-row items-start justify-between gap-4">
+                <div className="space-y-1">
+                    <CardTitle className="text-base">{title}</CardTitle>
+                    <CardDescription>{description}</CardDescription>
+                </div>
+                <Link
+                    to={href}
+                    className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                    查看全部
+                    <ArrowUpRight className="size-3.5" />
+                </Link>
+            </CardHeader>
+            <CardContent className="min-h-0 min-w-0 flex-1 overflow-hidden">
+                {children}
+            </CardContent>
+        </Card>
+    )
+}

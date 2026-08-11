@@ -9,12 +9,13 @@ import {
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
-    TOOLBAR_BUTTON,
 } from "../lib/styles";
 import { useCustomersCatalog } from "@/hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { EditCustomer, type EditCustomerHandle } from "@/components/customers/EditCustomer";
 import type { KatanaCustomer } from "@/models/katana/customers";
+import { Button } from "@/components/ui/button";
+import { RefreshButton } from "@/components/RefreshButton";
 
 /** null = closed, -1 = new customer creation, number = editing customer id */
 type CustomerTarget = { customerId: number } | null;
@@ -63,17 +64,15 @@ export const Customers = () => {
             title="客戶管理"
             actions={
                 <>
-                    <button
+                    <Button
                         onClick={() => setCustomerTarget({ customerId: -1 })}
                         className={PRIMARY_BUTTON}
                     >
                         <Plus width="14" height="14" />
                         新增客戶
-                    </button>
+                    </Button>
 
-                    <button onClick={() => refetchCustomers()} className={TOOLBAR_BUTTON}>
-                        重新整理客戶
-                    </button>
+                    <RefreshButton label="重新整理客戶" onClick={() => refetchCustomers()} />
 
                     <div className="w-full sm:w-80">
                         <input

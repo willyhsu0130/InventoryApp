@@ -15,26 +15,26 @@ export const ManufactureTable = ({ items, onRowClick }: ManufactureTableProps) =
         switch (status) {
             case "DONE":
                 return (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                    <span className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
                         已完成 (DONE)
                     </span>
                 );
             case "IN_PROGRESS":
                 return (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-950 text-blue-400 border border-blue-800/60">
+                    <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">
                         進行中 (IN_PROGRESS)
                     </span>
                 );
             case "BLOCKED":
                 return (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-950 text-red-400 border border-red-800/60">
+                    <span className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-800">
                         已阻塞 (BLOCKED)
                     </span>
                 );
             case "NOT_STARTED":
             default:
                 return (
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                    <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                         未開始 (NOT_STARTED)
                     </span>
                 );
@@ -46,7 +46,7 @@ export const ManufactureTable = ({ items, onRowClick }: ManufactureTableProps) =
             header: "工單編號",
             render: (mo) => (
                 <div className="flex flex-col">
-                    <span className="font-mono text-sm font-medium text-slate-100">
+                    <span className="font-mono text-sm font-medium text-foreground">
                         {mo.order_no || `MO-${mo.id}`}
                     </span>
                     {mo.is_linked_to_sales_order && (
@@ -67,7 +67,7 @@ export const ManufactureTable = ({ items, onRowClick }: ManufactureTableProps) =
                             {details?.product_name ?? `Variant #${mo.variant_id}`}
                         </span>
                         {details?.variant_details && (
-                            <span className="text-xs text-slate-400 mt-0.5">
+                            <span className="text-xs text-muted-foreground mt-0.5">
                                 {details.variant_details}
                             </span>
                         )}

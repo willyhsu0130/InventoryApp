@@ -32,6 +32,7 @@ export const KATANA_API_ROUTES = {
   CUSTOMER_BY_ID: (id: number | string) => `/customers/${id}`,
   SALES_ORDERS: '/sales_orders',
   SALES_ORDER_BY_ID: (id: number | string) => `/sales_orders/${id}`,
+  SALES_ORDER_ROW_BY_ID: (id: number | string) => `/sales_order_rows/${id}`,
 
   // Manufacturing
   MANUFACTURING_ORDERS: '/manufacturing_orders',

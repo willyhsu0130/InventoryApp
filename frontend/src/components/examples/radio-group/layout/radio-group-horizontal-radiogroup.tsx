@@ -1,5 +1,5 @@
-import { Label } from "~/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const Example = () => (
   <RadioGroup className="flex flex-row space-x-4" defaultValue="option-1">

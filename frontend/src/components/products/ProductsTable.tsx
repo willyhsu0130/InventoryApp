@@ -1,6 +1,7 @@
 // src/components/products/ProductsTable.tsx
 import { DataTable, type Column } from "../DataTable";
 import type { DisplayProductRow } from "../../pages/Products";
+import { Button } from "@/components/ui/button";
 
 interface ProductsTableProps {
     items: DisplayProductRow[]
@@ -13,9 +14,10 @@ export const ProductsTable = ({ items, onRowClick }: ProductsTableProps) => {
             align: "center",
             className: "w-10",
             render: () => (
-                <button
+                <Button
                     type="button"
-                    className="text-slate-500 hover:text-emerald-400 p-1 rounded-md hover:bg-slate-800 transition"
+                    variant="ghost"
+                    size="icon-xs"
                     title="編輯"
                 >
                     <svg
@@ -27,7 +29,7 @@ export const ProductsTable = ({ items, onRowClick }: ProductsTableProps) => {
                         <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
                         <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10a.75.75 0 000-1.5H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
                     </svg>
-                </button>
+                </Button>
             ),
         },
         {
@@ -68,7 +70,7 @@ export const ProductsTable = ({ items, onRowClick }: ProductsTableProps) => {
             header: "Variant ID",
             align: "right",
             render: (item) => (
-                <span className="font-mono text-slate-500">#{item.variantId}</span>
+                <span className="font-mono text-muted-foreground">#{item.variantId}</span>
             ),
         },
     ];

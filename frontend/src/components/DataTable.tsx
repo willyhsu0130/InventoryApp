@@ -1,5 +1,13 @@
 // src/components/common/DataTable.tsx
 import type { ReactNode } from "react";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 
 export interface Column<T> {
     header: string;
@@ -25,16 +33,16 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
     return (
         <div
-            className="overflow-auto overscroll-contain h-full rounded-lg border border-slate-800 bg-slate-900/50 shadow-sm relative"
+            className="relative flex h-full min-h-0 min-w-0 w-full overflow-hidden overscroll-contain rounded-md border bg-card [&_td]:text-foreground [&_.text-slate-100]:!text-foreground [&_.text-slate-200]:!text-foreground [&_.text-slate-300]:!text-foreground [&_.text-slate-400]:!text-muted-foreground [&_.text-slate-500]:!text-muted-foreground"
             id="dataTable"
         >
-            <table className="w-full text-left text-sm text-slate-300 border-separate border-spacing-0">
-                <thead className="sticky top-0 z-10 text-slate-400 font-medium text-xs uppercase tracking-wider">
-                    <tr>
+            <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card">
+                    <TableRow className="hover:bg-card">
                         {columns.map((col, idx) => (
-                            <th
+                            <TableHead
                                 key={idx}
-                                className={`py-3 px-4 bg-slate-950 border-b border-slate-800 ${
+                                className={`whitespace-nowrap text-xs uppercase tracking-wider ${
                                     col.align === "right"
                                         ? "text-right"
                                         : col.align === "center"
@@ -43,33 +51,33 @@ export function DataTable<T>({
                                 } ${col.className || ""}`}
                             >
                                 {col.header}
-                            </th>
+                            </TableHead>
                         ))}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
+                    </TableRow>
+                </TableHeader>
+                <TableBody className="font-mono text-xs">
                     {data.length === 0 ? (
-                        <tr>
-                            <td
+                        <TableRow>
+                            <TableCell
                                 colSpan={columns.length}
-                                className="py-8 text-center text-slate-500 font-sans"
+                                className="h-24 text-center font-sans text-muted-foreground"
                             >
                                 {emptyMessage}
-                            </td>
-                        </tr>
+                            </TableCell>
+                        </TableRow>
                     ) : (
                         data.map((item) => (
-                            <tr
+                            <TableRow
                                 key={keyExtractor(item)}
                                 onClick={() => onRowClick?.(item)}
-                                className={`hover:bg-slate-800/60 transition-colors ${
+                                className={`${
                                     onRowClick ? "cursor-pointer" : ""
                                 }`}
                             >
                                 {columns.map((col, idx) => (
-                                    <td
+                                    <TableCell
                                         key={idx}
-                                        className={`py-3 px-4 border-b border-slate-800/40 ${
+                                        className={`whitespace-nowrap ${
                                             col.align === "right"
                                                 ? "text-right"
                                                 : col.align === "center"
@@ -78,13 +86,13 @@ export function DataTable<T>({
                                         }`}
                                     >
                                         {col.render(item)}
-                                    </td>
+                                    </TableCell>
                                 ))}
-                            </tr>
+                            </TableRow>
                         ))
                     )}
-                </tbody>
-            </table>
+                </TableBody>
+            </Table>
         </div>
     );
 }

@@ -21,11 +21,11 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
                 const details = productCtx?.getVariantDetails(item.variant_id);
                 return (
                     <div className="font-sans">
-                        <div className="font-medium text-slate-100 text-sm">
+                        <div className="font-medium text-foreground text-sm">
                             {details?.product_name ?? `Variant #${item.variant_id}`}
                         </div>
                         {details?.variant_details && (
-                            <div className="text-xs text-slate-400 mt-0.5">
+                            <div className="text-xs text-muted-foreground mt-0.5">
                                 {details.variant_details}
                             </div>
                         )}
@@ -50,9 +50,9 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             render: (item) => {
                 const details = productCtx?.getVariantDetails(item.variant_id);
                 return (
-                    <span className="font-bold text-slate-100">
+                    <span className="font-bold text-foreground">
                         {parseFloat(item.quantity_in_stock)}{" "}
-                        <span className="text-white font-normal text-[10px]">
+                        <span className="text-muted-foreground font-normal text-[10px]">
                             {details?.uom}
                         </span>
                     </span>
@@ -63,7 +63,7 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             header: "使用",
             align: "right",
             render: (item) => (
-                <span className="text-white">
+                <span className="text-foreground">
                     {parseFloat(item.quantity_committed)}
                 </span>
             ),
@@ -72,7 +72,7 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             header: "預期",
             align: "right",
             render: (item) => (
-                <span className="text-white">
+                <span className="text-foreground">
                     {parseFloat(item.quantity_expected)}
                 </span>
             ),

@@ -144,6 +144,10 @@ export const EditManufacture = ({
                 planned_quantity: plannedQuantity,
                 order_no: orderNo.trim() || undefined,
                 status,
+                ...(status === "DONE" && {
+                    actual_quantity: plannedQuantity,
+                    done_date: new Date().toISOString(),
+                }),
                 // Only include deadline date if user explicitly picked one AND we aren't restricted
                 // Omit production_deadline_date when automatic deadline management is enabled in Katana
                 // production_deadline_date: deadlineDate ? deadlineDate.toISOString() : undefined,
@@ -221,12 +225,12 @@ export const EditManufacture = ({
 
                 {/* FIX 3: Batch Assign Banner / Trigger Button */}
                 {isBatchTracked && (
-                    <div className="col-span-2 bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
-                        <div className="flex items-center gap-x-2 text-xs text-slate-300">
-                            <Layers className="w-4 h-4 text-emerald-400" />
+                    <div className="col-span-2 bg-muted p-3 rounded-lg border border-border flex items-center justify-between">
+                        <div className="flex items-center gap-x-2 text-xs text-foreground">
+                            <Layers className="w-4 h-4 text-primary" />
                             <span>
                                 {traceability.length > 0 && traceability[0].batch_id
-                                    ? `已指派批號名稱: ${batch.get(traceability[0].batch_id)?.batch_number}`
+                                    ? `已指派批號名稱: ${batch.get(traceability[0].batch_id)?.batch_number ?? traceability[0].batch_id}
                                     : "此商品需追蹤批號 (Batch Tracked)"}
                             </span>
                         </div>
@@ -270,11 +274,11 @@ export const EditManufacture = ({
                 <div className="flex flex-col gap-y-1 col-span-2">
                     <label className={FIELD_LABEL}>預計生產截止日</label>
                     <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                        <PopoverTrigger className="w-full justify-start text-left font-normal bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800 rounded-md px-3 py-2 text-sm inline-flex items-center">
-                            <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                        <PopoverTrigger className="w-full justify-start text-left font-normal bg-background border border-input text-foreground hover:bg-muted rounded-md px-3 py-2 text-sm inline-flex items-center">
+                            <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                             {deadlineDate ? format(deadlineDate, "yyyy/MM/dd") : <span>選擇日期</span>}
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
+                        <PopoverContent className="w-auto p-0 bg-popover border-border text-popover-foreground" align="start">
                             <Calendar
                                 mode="single"
                                 selected={deadlineDate}

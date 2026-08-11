@@ -51,7 +51,7 @@ export const CustomersTable = ({ items, onRowClick }: CustomersTableProps) => {
             header: "預設幣別",
             align: "center",
             render: (customer) => (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">
+                <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-mono font-medium text-foreground">
                     {customer.currency || "TWD"}
                 </span>
             ),

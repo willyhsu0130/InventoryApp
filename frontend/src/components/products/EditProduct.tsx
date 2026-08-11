@@ -5,6 +5,7 @@ import { InlineInput } from "../InlineInput";
 import { ConfigOptionsEditor } from "./ConfigOptionEditor";
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Button } from "@/components/ui/button"
 import { createEmptyProductDraft, isUnsavedProduct, syncDraftVariantsToConfigs, type KatanaProductConfig, type KatanaProductDraft, type KatanaProductDraftVariant } from "@/models/katana/productVariant";
 
 
@@ -66,7 +67,17 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         const variantId = updatedVariant.id;
         if (isCreating || variantId === undefined) return;
 
-        await editVariant({ ...updatedVariant, id: variantId });
+        try {
+            await editVariant({ ...updatedVariant, id: variantId });
+        } catch (error) {
+            // Restore the previous value when the provider rejects the update.
+            setproduct((prev) => {
+                const variants = [...prev.variants];
+                variants[variantIndex] = targetVariant;
+                return { ...prev, variants };
+            });
+            setFormError(error instanceof Error ? error.message : "更新產品款式失敗。");
+        }
     };
 
     // Product stuff — accepts string (text inputs) or boolean (radio/checkbox flags)
@@ -315,9 +326,14 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
                     {
                         // Check if config length > 0
                         formProduct.configs.length > 0 ?
-                            <button onClick={handleOpenModal} className="bg-black p-3 rounded-xl">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleOpenModal}
+                                className="w-full whitespace-normal sm:w-auto"
+                            >
                                 調整產品規格
-                            </button>
+                            </Button>
                             :
                             <div>
                                 <p>這個產品有不只一種款式嗎?</p>
@@ -379,6 +395,7 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
                                     <InlineInput
                                         type="text"
                                         value={variant.sku ?? ""}
+                                        className="w-full cursor-text rounded border border-input bg-background px-2 py-1 text-left text-foreground transition-colors hover:bg-muted focus:border-ring focus:outline-none"
                                         onCommit={(newSku) => commitVariantChange(v_index, { sku: newSku })}
                                     />
                                 </td>

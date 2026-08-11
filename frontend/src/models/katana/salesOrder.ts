@@ -163,7 +163,7 @@ export interface CreateSalesOrderPayload {
     delivery_date?: string;
     currency?: string;
     location_id?: number;
-    status?: "NOT_SHIPPED" | "PENDING";
+    status?: KatanaSalesOrderStatus;
     additional_info?: string;
     customer_ref?: string;
     ecommerce_order_type?: string;
@@ -184,7 +184,7 @@ export interface KatanaSalesOrderDraft {
     additional_info?: string | null;
     customer_ref?: string | null;
     currency?: string;
-    status?: "NOT_SHIPPED" | "PENDING";
+    status?: KatanaSalesOrderStatus;
     sales_order_rows: Array<{
         variant_id: number;
         quantity: number;
@@ -192,6 +192,15 @@ export interface KatanaSalesOrderDraft {
         tax_rate_id?: number | null;
         location_id?: number | null;
     }>;
+}
+
+export interface UpdateSalesOrderRowPayload {
+    quantity?: number;
+    variant_id?: number;
+    tax_rate_id?: number;
+    location_id?: number;
+    price_per_unit?: number;
+    traceability?: KatanaTraceabilityEntry[];
 }
 
 export interface UpdateSalesOrderPayload {

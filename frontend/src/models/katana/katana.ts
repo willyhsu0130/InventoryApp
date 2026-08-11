@@ -1,17 +1,11 @@
-// ==========================================
-// 1. COMMON & CONFIG TYPES
-// ==========================================
+export * from "./common";
+export * from "./customers";
+export * from "./inventory";
+export * from "./manufacture";
+export * from "./productVariant";
+export * from "./salesOrder";
 
-
-
-
-// ==========================================
-// 6. STOCK ADJUSTMENT & BATCH MODELS
-// ==========================================
-
-// ==========================================
-// 7. PURCHASE ORDER MODELS
-// ==========================================
+// Purchase order models remain defined in this compatibility barrel.
 
 export type KatanaPurchaseOrderStatus =
   | "NOT_RECEIVED"
@@ -52,5 +46,4 @@ export interface KatanaPurchaseOrder {
 // ==========================================
 
 // --- Product Converters ---
-
 
