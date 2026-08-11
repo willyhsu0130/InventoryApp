@@ -1,54 +1,110 @@
-import { useEffect, useState } from "react"
-import { katanaFetch } from "../lib/katanaFetch"
-import { KATANA_API_ROUTES } from "../lib/routes/routes"
+import { InventoryTable } from "@/components/inventory/InventoryTable";
+import { OrdersTable } from "@/components/orders/OrdersTable";
+import { ManufactureTable } from "@/components/manufacture/ManufactureTable";
+import {
+    useInventoryCatalog,
+    useOrdersCatalog,
+    useManufactureCatalog,
+} from "@/hooks/useContexts";
+import { useMemo } from "react";
+import { Link } from "react-router";
 
 export const Dashboard = () => {
-    const [data, setData] = useState<unknown>(null)
-    const [loading, setLoading] = useState<boolean>(true)
-    const [error, setError] = useState<string | null>(null)
+    const { inventory } = useInventoryCatalog();
+    const { orders } = useOrdersCatalog();
+    const { manufactureOrders } = useManufactureCatalog();
 
-    useEffect(() => {
-        const testKatanaRoute = async () => {
-            setLoading(true)
-
-            // Test fetching inventory stock levels (or VARIANTS)
-            const res = await katanaFetch(KATANA_API_ROUTES.INVENTORY)
-
-            if (res.success) {
-                console.log("Katana Connection Successful:", res.data)
-                setData(res.data)
-            } else {
-                console.error("Katana Fetch Error:", res.message)
-                setError(res.message)
-            }
-
-            setLoading(false)
-        }
-
-        testKatanaRoute()
-    }, []) // Empty array ensures this runs once on mount
+    const inventoryList = useMemo(() => Array.from(inventory.values()), [inventory]);
+    const ordersList = useMemo(() => Array.from(orders.values()), [orders]);
+    const manufactureList = useMemo(
+        () => Array.from(manufactureOrders.values()),
+        [manufactureOrders]
+    );
 
     return (
-        <div className="p-6">
-            <h2 className="text-xl font-bold text-slate-100 mb-4">Katana API Route Test</h2>
+        /* Full height container with a 2-column grid */
+        <div className="w-full h-[calc(100vh-4rem)] p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
 
-            {loading && <p className="text-slate-400">Connecting to Katana API...</p>}
+            {/* LEFT COLUMN: 1/3 top (Summary), 2/3 bottom (Orders) */}
+            <div className="flex flex-col gap-4 h-full min-h-0">
+                {/* 1/3 Height Card - Summary Placeholder */}
+                <div className="h-1/3 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        快速概覽
+                    </h3>
+                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-hidden">
+                        {/* 1/3 Content */}
+                        <div>
 
-            {error && (
-                <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-md text-red-200">
-                    <p className="font-semibold">Fetch Failed:</p>
-                    <p className="text-sm font-mono mt-1">{error}</p>
+                        </div>
+                        <div>
+
+                        </div>
+                        <div>
+
+                        </div>
+                    </div>
                 </div>
-            )}
 
-            {data !== null && (
-                <div className="bg-slate-900 p-4 rounded-md border border-slate-800">
-                    <p className="text-emerald-400 font-semibold mb-2">Connected Successfully!</p>
-                    <pre className="text-xs font-mono text-slate-300 max-h-96 overflow-auto">
-                        {JSON.stringify(data, null, 2)}
-                    </pre>
+                {/* 2/3 Height Card - Orders Table */}
+                <div className="h-2/3 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            訂單總覽
+                        </h3>
+                        <Link
+                            to="/orders"
+                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                        >
+                            查看全部 →
+                        </Link>
+                    </div>
+                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-y-auto">
+                        <OrdersTable items={ordersList} />
+                    </div>
                 </div>
-            )}
+            </div>
+
+            {/* RIGHT COLUMN: 1/2 top (Inventory), 1/2 bottom (Manufacture) */}
+            <div className="flex flex-col gap-4 h-full min-h-0">
+                {/* 1/2 Height Card - Inventory Table */}
+                <div className="h-1/2 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            庫存預警
+                        </h3>
+                        <Link
+                            to="/inventory"
+                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                        >
+                            查看全部 →
+                        </Link>
+                    </div>
+
+                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-y-auto">
+                        <InventoryTable items={inventoryList} />
+                    </div>
+                </div>
+
+                {/* 1/2 Height Card - Manufacture Table */}
+                <div className="h-1/2 min-h-0 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col">
+                    <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                            製造
+                        </h3>
+                        <Link
+                            to="/manufacture"
+                            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
+                        >
+                            查看全部 →
+                        </Link>
+                    </div>
+                    <div className="flex-1 min-h-0 bg-slate-950/50 rounded-lg p-3 border border-slate-800/60 overflow-y-auto">
+                        <ManufactureTable items={manufactureList} />
+                    </div>
+                </div>
+            </div>
+
         </div>
-    )
-}
+    );
+};

@@ -61,8 +61,18 @@ export const Orders = () => {
             );
         });
     }, [ordersList, searchTerm, productCtx]);
-    console.log("filteredItems", filteredItems, orders)
     const isGlobalLoading = loading || (productCtx?.loading ?? false);
+
+    const handleDelete = async () => {
+        if (!orderTarget || orderTarget.orderId === -1) return;
+
+        try {
+            await deleteOrder(orderTarget.orderId);
+            setOrderTarget(null); // Close modal on successful delete
+        } catch (err) {
+            console.error("Failed to delete order:", err);
+        }
+    };
 
     return (
         <PageLayout
@@ -116,7 +126,11 @@ export const Orders = () => {
                 onClose={() => setOrderTarget(null)}
                 isSaving={isSaving}
                 onSave={() => editOrderRef.current?.submit()}
-                onDelete={() => deleteOrder(orderTarget?.orderId)}
+                onDelete={
+                    orderTarget && orderTarget.orderId !== -1
+                        ? handleDelete
+                        : undefined
+                }
             >
                 {orderTarget !== null && (
                     <EditOrder

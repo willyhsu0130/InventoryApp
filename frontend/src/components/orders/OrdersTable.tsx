@@ -1,5 +1,5 @@
 // src/components/orders/OrdersTable.tsx
-import type { KatanaSalesOrder, KatanaSalesOrderStatus } from "../../models/katana/katana";
+import type { KatanaSalesOrder, KatanaSalesOrderStatus } from "../../models/katana/salesOrder";
 import { DataTable, type Column } from "../DataTable";
 import { format } from "date-fns";
 
@@ -34,14 +34,14 @@ const renderStatusBadge = (status: KatanaSalesOrderStatus) => {
         case "CANCELLED":
             return (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-950/60 text-red-400 border border-red-800/50 font-sans">
-                    已取消 (Cancelled)
+                    已取消
                 </span>
             );
         case "NOT_SHIPPED":
         default:
             return (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-950/60 text-amber-400 border border-amber-800/50 font-sans">
-                    未出貨 (Not Shipped)
+                    未出貨
                 </span>
             );
     }

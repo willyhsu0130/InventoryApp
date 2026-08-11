@@ -1,8 +1,5 @@
+import type { KatanaSalesOrder, KatanaSalesOrderDraft } from "@/models/katana/salesOrder";
 import { createContext } from "react";
-import type {
-    KatanaSalesOrder,
-    KatanaSalesOrderDraft,
-} from "../models/katana";
 
 /** A variant that already exists in Katana, so it can be PATCHed by id. */
 

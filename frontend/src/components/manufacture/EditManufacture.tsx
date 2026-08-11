@@ -1,18 +1,23 @@
-import { useImperativeHandle, useState, useEffect, useMemo } from "react";
-import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL } from "@/lib/styles";
-import { useManufactureCatalog, useProductCatalog } from "@/hooks/useContexts";
+// src/components/manufacture/EditManufacture.tsx
+import { useImperativeHandle, useEffect, useMemo, useState, useRef } from "react";
+import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL, PRIMARY_BUTTON } from "@/lib/styles";
+import { useInventoryCatalog, useManufactureCatalog, useProductCatalog } from "@/hooks/useContexts";
+import { EditModal } from "@/components/EditModal";
+import { BatchAssign, type BatchAssignHandle } from "./BatchAssign";
 import { katanaFetch } from "@/lib/katanaFetch";
 import { KATANA_API_ROUTES } from "@/lib/routes/routes";
 import type { KatanaLocation } from "@/models/katana/common";
 import type {
     KatanaManufacturingOrderDraft,
     KatanaManufacturingOrderStatus,
+    KatanaMOTraceabilityPayload,
 } from "@/models/katana/manufacture";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Layers } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import type { KatanaVariant } from "@/models/katana/productVariant";
+import { InlineInput } from "../InlineInput";
 
 export interface EditManufactureHandle {
     submit: () => Promise<void>;
@@ -21,20 +26,21 @@ export interface EditManufactureHandle {
 interface EditManufactureProps {
     id: number | -1;
     onSavingChange?: (isSaving: boolean) => void;
-    onCreated?: (moId: number) => void;
+    onSuccess: () => void;
     ref?: React.Ref<EditManufactureHandle>;
 }
 
 export const EditManufacture = ({
     id,
     onSavingChange,
-    onCreated,
+    onSuccess,
     ref,
 }: EditManufactureProps) => {
     const isCreating = id === -1;
 
     const { manufactureOrders, createMO, editMO } = useManufactureCatalog();
     const { products, getVariantDetails } = useProductCatalog();
+    const { batch } = useInventoryCatalog()
 
     const existingMO = !isCreating ? manufactureOrders.get(id) : null;
 
@@ -58,6 +64,21 @@ export const EditManufacture = ({
         existingMO?.additional_info ?? ""
     );
     const [formError, setFormError] = useState<string | null>(null);
+
+    // Batch Assignment
+    const batchAssignRef = useRef<BatchAssignHandle>(null);
+    const [batchModalOpen, setBatchModalOpen] = useState(false);
+    const [isSavingBatch, setIsSavingBatch] = useState(false);
+    const [traceability, setTraceability] = useState<KatanaMOTraceabilityPayload[]>(
+        existingMO?.traceability ?? []
+    );
+
+    // Check if selected variant is batch tracked
+    const isBatchTracked = useMemo(() => {
+        if (!variantId) return false;
+        const details = getVariantDetails(variantId);
+        return details?.batch_tracked ?? false;
+    }, [variantId, getVariantDetails]);
 
     useEffect(() => {
         let isMounted = true;
@@ -123,16 +144,22 @@ export const EditManufacture = ({
                 planned_quantity: plannedQuantity,
                 order_no: orderNo.trim() || undefined,
                 status,
-                production_deadline_date: deadlineDate ? deadlineDate.toISOString() : undefined,
+                // Only include deadline date if user explicitly picked one AND we aren't restricted
+                // Omit production_deadline_date when automatic deadline management is enabled in Katana
+                // production_deadline_date: deadlineDate ? deadlineDate.toISOString() : undefined,
                 additional_info: additionalInfo.trim() || undefined,
+                traceability: traceability.length > 0 ? traceability : undefined,
             };
 
+            // If creating a new order, drop production_deadline_date to prevent 422 error
             if (isCreating) {
-                const created = await createMO(draftPayload);
-                onCreated?.(created.id);
+                delete draftPayload.production_deadline_date;
+                await createMO(draftPayload);
             } else {
                 await editMO(id, draftPayload);
             }
+
+            onSuccess();
         } catch (err) {
             console.error("Failed to save manufacture order:", err);
             setFormError(err instanceof Error ? err.message : "儲存製造工單失敗。");
@@ -166,10 +193,10 @@ export const EditManufacture = ({
                         value={status}
                         onChange={(e) => setStatus(e.target.value as KatanaManufacturingOrderStatus)}
                     >
-                        <option value="NOT_STARTED">未開始 (NOT_STARTED)</option>
-                        <option value="IN_PROGRESS">進行中 (IN_PROGRESS)</option>
-                        <option value="BLOCKED">已阻塞 (BLOCKED)</option>
-                        <option value="DONE">已完工 (DONE)</option>
+                        <option value="NOT_STARTED">未開始</option>
+                        <option value="IN_PROGRESS">進行中</option>
+                        <option value="BLOCKED">已阻塞</option>
+                        <option value="DONE">已完工</option>
                     </select>
                 </div>
 
@@ -178,8 +205,10 @@ export const EditManufacture = ({
                     <select
                         className={CONTROL_INPUT}
                         value={variantId ?? ""}
-                        onChange={(e) => setVariantId(e.target.value ? Number(e.target.value) : null)}
-                        disabled={!isCreating}
+                        onChange={(e) => {
+                            setVariantId(e.target.value ? Number(e.target.value) : null);
+                            setTraceability([]);
+                        }}
                     >
                         <option value="">選擇要生產的產品款式...</option>
                         {availableVariants.map((v) => (
@@ -190,14 +219,35 @@ export const EditManufacture = ({
                     </select>
                 </div>
 
+                {/* FIX 3: Batch Assign Banner / Trigger Button */}
+                {isBatchTracked && (
+                    <div className="col-span-2 bg-slate-950 p-3 rounded-lg border border-slate-800 flex items-center justify-between">
+                        <div className="flex items-center gap-x-2 text-xs text-slate-300">
+                            <Layers className="w-4 h-4 text-emerald-400" />
+                            <span>
+                                {traceability.length > 0 && traceability[0].batch_id
+                                    ? `已指派批號名稱: ${batch.get(traceability[0].batch_id).batch_number}`
+                                    : "此商品需追蹤批號 (Batch Tracked)"}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setBatchModalOpen(true)}
+                            className={PRIMARY_BUTTON}
+                        >
+                            {traceability.length > 0 ? "變更批號" : "指派 / 建立批號"}
+                        </button>
+                    </div>
+                )}
+
                 <div className="flex flex-col gap-y-1">
                     <label className={FIELD_LABEL}>計畫生產數量 *</label>
-                    <input
+                    <InlineInput<number>
                         type="number"
-                        min="1"
-                        className={CONTROL_INPUT}
                         value={plannedQuantity}
-                        onChange={(e) => setPlannedQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className={CONTROL_INPUT}
+                        onCommit={(newValue) => setPlannedQuantity(Math.max(1, newValue))}
+                        formatter={(val) => `${val}`}
                     />
                 </div>
 
@@ -248,6 +298,36 @@ export const EditManufacture = ({
                     />
                 </div>
             </div>
+
+            {/* Batch Assign Modal */}
+            <EditModal
+                isOpen={batchModalOpen}
+                title="指派 / 建立批號"
+                showSaveButton={true}
+                isSaving={isSavingBatch}
+                onClose={() => setBatchModalOpen(false)}
+                onSave={async () => {
+                    setIsSavingBatch(true);
+                    try {
+                        await batchAssignRef.current?.submit();
+                        setBatchModalOpen(false);
+                    } finally {
+                        setIsSavingBatch(false);
+                    }
+                }}
+            >
+                {variantId && (
+                    <BatchAssign
+                        ref={batchAssignRef}
+                        variantId={variantId}
+                        quantity={plannedQuantity}
+                        onAssignBatch={(assignedTraceability) => {
+                            setTraceability(assignedTraceability);
+                            setFormError(null);
+                        }}
+                    />
+                )}
+            </EditModal>
         </div>
     );
 };

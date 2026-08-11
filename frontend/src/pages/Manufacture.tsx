@@ -135,7 +135,7 @@ export const Manufacture = () => {
                         onSavingChange={setIsSaving}
                         id={moTarget.moId}
                         ref={editManufactureRef}
-                        onCreated={() => {
+                        onSuccess={() => {
                             setMOTarget(null);
                         }}
                     />

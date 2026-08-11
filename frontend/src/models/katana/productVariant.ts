@@ -137,11 +137,13 @@ export interface KatanaCreateProductPayload {
 }
 
 export interface ResolvedVariantInfo {
+    productId: number
     product_name: string;
     variant_details: string | null;
     sku: string;
     uom: string;
     category_id: number | null;
+    batch_tracked?: boolean;
 }
 
 export const convertProductToPayload = (

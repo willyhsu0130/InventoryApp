@@ -5,6 +5,7 @@ interface InlineInputProps<T extends string | number> {
     type?: "text" | "number";
     formatter?: (val: T) => string;
     onCommit: (newValue: T) => void;
+    className?: string;
 }
 
 export const InlineInput = <T extends string | number>({
@@ -12,6 +13,7 @@ export const InlineInput = <T extends string | number>({
     type = "text",
     formatter,
     onCommit,
+    className
 }: InlineInputProps<T>) => {
     const [isEditing, setIsEditing] = useState(false);
     const [tempValue, setTempValue] = useState<string>(value?.toString() ?? "");
@@ -54,7 +56,7 @@ export const InlineInput = <T extends string | number>({
         return (
             <input
                 autoFocus
-                size={1} // 👈 Keeps input from forcing a large default width
+                size={1}
                 onFocus={(e) => e.target.select()}
                 type={type}
                 step={type === "number" ? "0.01" : undefined}
@@ -70,7 +72,7 @@ export const InlineInput = <T extends string | number>({
     return (
         <input
             onClick={() => setIsEditing(true)}
-            className={`${baseClasses} border border-transparent cursor-pointer hover:bg-slate-800/60 text-slate-200 transition-colors`}
+            className={className ?? `${baseClasses} border border-transparent cursor-pointer hover:bg-slate-800/60 text-slate-200 transition-colors`}
             readOnly
             value={formatter ? formatter(value) : value}
         />

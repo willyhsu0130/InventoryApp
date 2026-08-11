@@ -4,19 +4,12 @@ import type {
     KatanaProductDraft,
     KatanaProductDraftVariant,
     KatanaVariant,
-} from "../models/katana/katana";
+    ResolvedVariantInfo
+} from "../models/katana/productVariant";
 
 /** A variant that already exists in Katana, so it can be PATCHed by id. */
 export type SavedDraftVariant = KatanaProductDraftVariant & { id: number };
 
-export interface ResolvedVariantInfo {
-    productId: number
-    product_name: string;
-    variant_details: string | null;
-    sku: string;
-    uom: string;
-    category_name: string;
-}
 
 interface ProductContextType {
     products: Map<number, KatanaProduct>;

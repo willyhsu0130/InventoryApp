@@ -10,11 +10,12 @@ import {
     convertStockAdjustmentToCreatePayload,
     type KatanaBatch,
     type KatanaInventoryItem,
-    type KatanaLocation,
     type KatanaStockAdjustment,
     type KatanaStockAdjustmentRowInput,
     type KatanaTraceabilityEntry,
-} from "../../models/katana/katana";
+} from "../../models/katana/inventory";
+
+import type { KatanaLocation } from "@/models/katana/common";
 
 import { Calendar } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button"
@@ -75,7 +76,6 @@ export const StockAdjustmentModal = ({
     );
     const [reason, setReason] = useState("");
     const [adjustmentDate, setAdjustmentDate] = useState(todayInputValue);
-    const [adjustmentCalendarOpen, setAdjustmentCalendarOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 

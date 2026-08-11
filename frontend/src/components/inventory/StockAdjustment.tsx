@@ -8,10 +8,10 @@ import { useInventoryCatalog, useProductCatalog } from "../../hooks/useContexts"
 import {
     type KatanaBatch,
     type KatanaInventoryItem,
-    type KatanaLocation,
     type KatanaStockAdjustmentRowInput,
     type KatanaTraceabilityEntry,
-} from "../../models/katana/katana";
+} from "../../models/katana/inventory";
+import type { KatanaLocation } from "@/models/katana/common";
 
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";

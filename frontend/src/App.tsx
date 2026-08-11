@@ -15,10 +15,11 @@ import { OrdersProvider } from "./context/orders/OrdersProvider"
 import { CustomersProvider } from "./context/customers/CustomersProvider"
 import { Customers } from "./pages/Customers"
 import { ManufactureProvider } from "./context/manufacture/ManufactureProvider"
+import { TooltipProvider } from "./components/ui/tooltip"
 
 // Helper component to keep App.tsx clean
 const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ErrorProvider>
+  <TooltipProvider><ErrorProvider>
     <CustomersProvider>
       <ManufactureProvider>
         <ProductProvider>
@@ -30,7 +31,8 @@ const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         </ProductProvider>
       </ManufactureProvider>
     </CustomersProvider>
-  </ErrorProvider>
+  </ErrorProvider></TooltipProvider>
+
 );
 
 export default function App() {
