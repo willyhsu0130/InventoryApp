@@ -51,26 +51,26 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
     return (
         <div className="flex flex-col gap-y-5">
             {/* Header Labels */}
-            <div className="flex gap-x-3 border-b border-slate-800 pb-2">
-                <div className="w-1/3">
+            <div className="grid grid-cols-1 gap-2 border-b border-slate-800 pb-2 sm:grid-cols-3 sm:gap-x-3">
+                <div className="sm:col-span-1">
                     <p className="text-xs font-medium text-slate-400">款式選項 (例如: 尺寸)</p>
                 </div>
-                <div className="w-2/3">
+                <div className="sm:col-span-2">
                     <p className="text-xs font-medium text-slate-400">款式種類 (例如: S, M, L)</p>
                 </div>
             </div>
 
             {/* Existing Configs */}
             {configs.map((config, index) => (
-                <div key={index} className="flex gap-x-3 items-center">
-                    <div className="w-1/3">
+                <div key={index} className="grid grid-cols-1 items-center gap-2 sm:grid-cols-3 sm:gap-x-3">
+                    <div className="sm:col-span-1">
                         <input
                             className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-sm text-slate-200 focus:outline-none"
                             value={config.name}
                             readOnly
                         />
                     </div>
-                    <div className="w-2/3 flex items-center justify-between">
+                    <div className="flex items-center justify-between sm:col-span-2">
                         <div className="flex gap-2 flex-wrap">
                             {config.values.map((value, vIdx) => (
                                 <div key={vIdx} className="flex bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 gap-x-1.5 items-center">
@@ -92,8 +92,8 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
             {/* Inline Add Config Section */}
             {addingConfigOption ? (
                 <div className="flex flex-col gap-y-3 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
-                    <div className="flex gap-x-3">
-                        <div className="w-1/3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="sm:col-span-1">
                             <input
                                 type="text"
                                 placeholder="選項名稱 (例: 顏色)"
@@ -102,11 +102,11 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
                                 onChange={(e) => setNewConfigName(e.target.value)}
                             />
                         </div>
-                        <div className="w-2/3 flex gap-x-2">
+                        <div className="flex gap-x-2 sm:col-span-2">
                             <input
                                 type="text"
                                 placeholder="輸入數值後按 Enter"
-                                className="flex-1 bg-slate-800 border border-slate-700 rounded px-2.5 py-1 text-sm text-slate-200 focus:outline-none"
+                                className="min-w-0 flex-1 rounded border border-input bg-background px-2.5 py-1 text-sm text-foreground focus:outline-none"
                                 value={newConfigValueInput}
                                 onChange={(e) => setNewConfigValueInput(e.target.value)}
                                 onKeyDown={(e) => {
@@ -119,7 +119,7 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
                             <button
                                 type="button"
                                 onClick={handleAddNewConfigValue}
-                                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs text-slate-200"
+                                className="shrink-0 rounded border border-input bg-background px-3 py-1 text-xs text-foreground hover:bg-muted"
                             >
                                 新增值
                             </button>

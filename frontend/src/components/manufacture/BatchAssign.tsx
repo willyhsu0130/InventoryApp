@@ -7,7 +7,7 @@ import type { KatanaMOTraceabilityPayload } from "@/models/katana/manufacture";
 import { Calendar as CalendarIcon, Plus } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { addYears, format, subDays } from "date-fns";
 
 export interface BatchAssignHandle {
     submit: () => Promise<void>;
@@ -43,11 +43,26 @@ export const BatchAssign = ({
 
     // Toggle for creating a new batch vs selecting existing
     const [isCreatingNewBatch, setIsCreatingNewBatch] = useState<boolean>(false);
-    const [newBatchNumber, setNewBatchNumber] = useState<string>("");
+    const [batchCreatedDate] = useState(() => new Date());
+    const defaultExpirationDate = subDays(addYears(batchCreatedDate, 2), 1);
+    const [expirationDate, setExpirationDate] = useState<Date | undefined>(defaultExpirationDate);
+    const [newBatchNumber, setNewBatchNumber] = useState(() =>
+        `${format(batchCreatedDate, "yyyy/MM/dd")} - ${format(defaultExpirationDate, "yyyy/MM/dd")}`
+    );
+    const [isBatchNumberCustomized, setIsBatchNumberCustomized] = useState(false);
 
     // Calendar state for Expiration Date
-    const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
     const [calendarOpen, setCalendarOpen] = useState<boolean>(false);
+
+    const handleExpirationDateChange = (date: Date | undefined) => {
+        setExpirationDate(date);
+        setCalendarOpen(false);
+        if (!isBatchNumberCustomized) {
+            setNewBatchNumber(
+                `${format(batchCreatedDate, "yyyy/MM/dd")} - ${date ? format(date, "yyyy/MM/dd") : "未設定"}`
+            );
+        }
+    };
 
     const handleSubmit = async () => {
         setError(null);
@@ -63,6 +78,7 @@ export const BatchAssign = ({
                 const payload: KatanaCreateBatchInput = {
                     batch_number: newBatchNumber.trim(),
                     variant_id: variantId,
+                    batch_created_date: format(batchCreatedDate, "yyyy-MM-dd"),
                     expiration_date: expirationDate ? expirationDate.toISOString() : undefined,
                 };
 
@@ -139,25 +155,25 @@ export const BatchAssign = ({
                             className={CONTROL_INPUT}
                             placeholder="例: BATCH-2026-001"
                             value={newBatchNumber}
-                            onChange={(e) => setNewBatchNumber(e.target.value)}
+                            onChange={(e) => {
+                                setIsBatchNumberCustomized(true);
+                                setNewBatchNumber(e.target.value);
+                            }}
                         />
                     </div>
 
                     <div className="flex flex-col gap-y-1">
                         <label className={FIELD_LABEL}>有效期限 (Expiration Date)</label>
                         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                            <PopoverTrigger className="w-full justify-start text-left font-normal bg-slate-900 border border-slate-700 text-slate-100 hover:bg-slate-800 rounded-md px-3 py-2 text-sm inline-flex items-center">
-                                <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                            <PopoverTrigger className="w-full justify-start text-left font-normal bg-background border border-input text-foreground hover:bg-muted rounded-md px-3 py-2 text-sm inline-flex items-center">
+                                <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                                 {expirationDate ? format(expirationDate, "yyyy/MM/dd") : <span>選擇日期</span>}
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-slate-900 border-slate-800 text-slate-100" align="start">
+                            <PopoverContent className="w-auto p-0 bg-popover border-border text-popover-foreground" align="start">
                                 <Calendar
                                     mode="single"
                                     selected={expirationDate}
-                                    onSelect={(date) => {
-                                        setExpirationDate(date);
-                                        setCalendarOpen(false);
-                                    }}
+                                    onSelect={handleExpirationDateChange}
                                 />
                             </PopoverContent>
                         </Popover>

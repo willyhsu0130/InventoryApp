@@ -1,6 +1,6 @@
 // src/components/common/EditModal.tsx
 import type { ReactNode } from "react";
-import { MoreVertical, Trash2 } from "lucide-react";
+import { MoreVertical, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -33,20 +33,25 @@ export const EditModal = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
+            <div
+                className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border bg-background text-foreground shadow-lg [&_input]:!border-input [&_input]:!bg-background [&_input]:!text-foreground [&_input]:[color-scheme:light] [&_select]:!border-input [&_select]:!bg-background [&_select]:!text-foreground [&_select]:[color-scheme:light] [&_textarea]:!border-input [&_textarea]:!bg-background [&_textarea]:!text-foreground [&_textarea]:[color-scheme:light] [&_input::placeholder]:!text-muted-foreground [&_textarea::placeholder]:!text-muted-foreground [&_input:focus]:!border-ring [&_select:focus]:!border-ring [&_textarea:focus]:!border-ring [&_input:focus]:!outline-none [&_select:focus]:!outline-none [&_textarea:focus]:!outline-none"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-modal-title"
+            >
                 {/* Modal Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
-                    <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
+                <div className="flex items-center justify-between border-b px-6 py-4">
+                    <h3 id="edit-modal-title" className="text-lg font-semibold">{title}</h3>
 
                     <div className="flex gap-x-3 items-center">
                         {/* Only meaningful when edits autosave — with a save button
                             present, nothing is stored until it is pressed. */}
                         {!showSaveButton && (
                             isSaving ?
-                                <p>儲存中...</p>
+                                <p className="text-sm text-muted-foreground">儲存中...</p>
                                 :
-                                <p>所有修改已儲存</p>
+                                <p className="text-sm text-muted-foreground">所有修改已儲存</p>
                         )}
                         {
                             onDelete &&
@@ -69,40 +74,41 @@ export const EditModal = ({
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         }
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={onClose}
-                            className="text-slate-400 hover:text-slate-200 text-sm p-1 rounded-md transition"
                             disabled={isSaving}
+                            aria-label="關閉"
                         >
-                            ✕
-                        </button>
+                            <X />
+                        </Button>
                     </div>
 
                 </div>
 
                 {/* Modal Body */}
-                <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div className="max-h-[70vh] space-y-4 overflow-y-auto p-6">
                     {children}
                 </div>
 
                 {/* Modal Actions */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-800 bg-slate-950/50">
-                    <button
+                <div className="flex items-center justify-end gap-3 border-t bg-muted/30 px-6 py-4">
+                    <Button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition"
                         disabled={isSaving}
+                        variant="outline"
                     >
                         取消
-                    </button>
+                    </Button>
                     {showSaveButton && onSave && (
-                        <button
+                        <Button
                             onClick={onSave}
                             disabled={isSaving}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
                         >
                             {isSaving ? "儲存中..." : "儲存 (Save)"}
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

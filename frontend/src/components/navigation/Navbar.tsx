@@ -1,40 +1,84 @@
+import { NavLink, useLocation } from "react-router-dom"
+import { Fish } from "lucide-react"
+
 import { navbarItems } from "./navbarItems"
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from "@/components/ui/sidebar"
 
-export const Navbar = ({ className, open }: {
-    className?: string
-    open: boolean
-}) => {
+export function Navbar() {
+    const location = useLocation()
+
     return (
-        <aside className={`flex flex-col bg-black h-full transition-all duration-300 ${open ? "w-50" : "w-16"} ${className}`}>
-            {navbarItems.map((item) => {
-                // Destructure and capitalize as a React component
-                const Icon = item.icon
-
-                return (
-                    <div className="border-b-2">
-                        <a
-                            key={item.link}
-                            href={item.link}
-                            className="flex items-center gap-10 p-3 rounded-md hover:bg-slate-800 transition-colors "
-                        >
-                            <Icon className="w-7 h-7 text-slate-400 shrink-0 z-10" />
-                            {
-                                open &&
-                                <span
-                                    className={`text-xl font-small transition-all duration-300 ease-in-out whitespace-nowrap overflow-hidden ${open
-                                        ? "opacity-100 max-w-xs"
-                                        : "opacity-0 max-w-0"
-                                        }`}
-                                >
-                                    {item.text}
+        <Sidebar collapsible="icon">
+            <SidebarHeader>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton size="lg" render={<NavLink to="/dashboard" />}>
+                                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                                    <Fish className="size-4" />
                                 </span>
-                            }
-                        </a>
-                    </div>
+                                <span className="flex min-w-0 flex-col text-left">
+                                    <span className="truncate font-semibold">晁欣漁產</span>
+                                    <span className="truncate text-xs text-sidebar-foreground/60">庫存管理系統</span>
+                                </span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarHeader>
 
-                )
-            })}
-        </aside>
+            <SidebarContent>
+                <SidebarGroup>
+                    <SidebarGroupLabel>管理</SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            {navbarItems.map((item) => {
+                                const Icon = item.icon
+
+                                return (
+                                    <SidebarMenuItem key={item.link}>
+                                        <SidebarMenuButton
+                                            render={<NavLink to={item.link} />}
+                                            isActive={
+                                                item.link === "/dashboard"
+                                                    ? location.pathname === "/dashboard" || location.pathname === "/"
+                                                    : location.pathname.startsWith(item.link)
+                                            }
+                                            tooltip={item.text}
+                                            className="h-9"
+                                        >
+                                            <Icon />
+                                            <span>{item.text}</span>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                )
+                            })}
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+            </SidebarContent>
+
+            <SidebarFooter>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton className="text-sidebar-foreground/60">
+                            <span className="flex size-6 items-center justify-center rounded-md border border-sidebar-border text-[10px] font-semibold">
+                                i
+                            </span>
+                            <span>Inventory App</span>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarFooter>
+        </Sidebar>
     )
-
 }

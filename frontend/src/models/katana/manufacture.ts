@@ -126,6 +126,8 @@ export interface KatanaManufacturingOrderDraft {
     planned_quantity: number;
     order_no?: string;
     status?: KatanaManufacturingOrderStatus;
+    actual_quantity?: number;
+    done_date?: string;
     production_deadline_date?: string | null;
     additional_info?: string | null;
     traceability?: KatanaMOTraceabilityPayload[];
@@ -190,6 +192,10 @@ export const convertMOToUpdatePayload = (
 
     return {
         ...(draft.status && { status: draft.status }),
+        ...(draft.status === "DONE" && {
+            actual_quantity: draft.actual_quantity,
+            done_date: draft.done_date,
+        }),
         ...(draft.variant_id != null && { variant_id: draft.variant_id }),
         ...(draft.location_id != null && { location_id: draft.location_id }),
         ...(draft.planned_quantity != null && { planned_quantity: draft.planned_quantity }),

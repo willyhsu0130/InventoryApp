@@ -396,7 +396,7 @@ export const StockAdjustmentModal = ({
                                                     {details.product_name}
                                                 </div>
                                                 {details.variant_details && (
-                                                    <div className="text-xs text-slate-400 mt-0.5">
+                                                    <div className="text-xs text-muted-foreground mt-0.5">
                                                         {details.variant_details}
                                                     </div>
                                                 )}
@@ -421,7 +421,7 @@ export const StockAdjustmentModal = ({
                                                     <div className="flex gap-x-3">
                                                         <div className="flex flex-col gap-y-1">
                                                             <select
-                                                                className="bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-2 py-1 text-slate-100 focus:outline-none transition"
+                                                                className="bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition"
                                                                 value={
                                                                     row.batchId === "new"
                                                                         ? NEW_BATCH_VALUE
@@ -442,7 +442,7 @@ export const StockAdjustmentModal = ({
                                                                 <input
                                                                     type="text"
                                                                     placeholder="新批次編號"
-                                                                    className="bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-2 py-1 text-slate-100 focus:outline-none transition"
+                                                                    className="bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition"
                                                                     value={row.newBatchNumber ?? ""}
                                                                     onChange={(e) =>
                                                                         handleNewBatchNumberChange(
@@ -459,7 +459,7 @@ export const StockAdjustmentModal = ({
                                                             {/* calendar */}
                                                             <Popover>
                                                                 <PopoverTrigger render={<Button variant="secondary"><CalendarIcon /></Button>} />
-                                                                <PopoverContent className="">
+                                                                <PopoverContent className="bg-popover border-border text-popover-foreground">
                                                                     <Calendar />
                                                                 </PopoverContent>
                                                             </Popover>

@@ -7,6 +7,9 @@ import { useError } from "../hooks/useError";
 import { EditModal } from "../components/EditModal";
 import { EditProduct, type EditProductHandle } from "../components/products/EditProduct";
 import { UNSAVED_PRODUCT_ID } from "@/models/katana/productVariant";
+import { Button } from "@/components/ui/button";
+import { RefreshButton } from "@/components/RefreshButton";
+import { CONTROL_INPUT } from "@/lib/styles";
 
 export interface DisplayProductRow {
     id: number;              // Product ID
@@ -106,12 +109,7 @@ export const Products = () => {
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     {/* Refresh Button */}
-                    <button
-                        onClick={() => refetchProducts()}
-                        className="h-9 px-3.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition shrink-0 flex items-center justify-center"
-                    >
-                        重新整理目錄
-                    </button>
+                    <RefreshButton label="重新整理目錄" onClick={() => refetchProducts()} />
 
                     {/* Search Input Container */}
                     <div className="w-full sm:w-80">
@@ -120,17 +118,19 @@ export const Products = () => {
                             placeholder="搜尋產品名稱、SKU 或類別..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full h-9 bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded-lg px-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition"
+                            className={CONTROL_INPUT}
                         />
                     </div>
 
                     {/* Plus Button */}
-                    <button
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="icon"
                         onClick={() => handleCreateProduct()}
-                        className="h-9 w-9 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition shrink-0 flex items-center justify-center"
                     >
                         <Plus width="14" height="14" />
-                    </button>
+                    </Button>
                 </div>
             </div>
 

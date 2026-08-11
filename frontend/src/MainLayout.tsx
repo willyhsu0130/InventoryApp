@@ -2,26 +2,20 @@
 import { Outlet } from "react-router-dom"
 import { Navbar } from "./components/navigation/Navbar"
 import { TopNav } from "./components/navigation/TopNav"
-import { useState } from "react"
+import { SidebarInset, SidebarProvider } from "./components/ui/sidebar"
+import { GlobalErrorBanner } from "./components/GlobalErrorBanner"
 
 export default function MainLayout() {
-    const [navbarIsOpen, setNavbarIsOpen] = useState(true)
-
     return (
-        <div className="flex flex-col w-screen h-screen overflow-hidden">
-            {/* TopNav automatically takes its natural height */}
-            <TopNav className="flex shrink-0" setNavbarIsOpen={setNavbarIsOpen} />
-
-            {/* Changed h-full -> flex-1 min-h-0 to claim ONLY the remaining screen space */}
-            <div className="flex-1 min-h-0 flex text-slate-100">
-                {/* Persistent Navigation */}
-                <Navbar open={navbarIsOpen} />
-
-                {/* Main Content Area: Added min-h-0 and flex flex-col so Outlet height is bounded */}
-                <main className="flex-1 min-h-0 flex flex-col" id="mainContent">
-                    <Outlet /> {/* Active page route (Dashboard, Orders, Inventory) renders here */}
+        <SidebarProvider defaultOpen className="h-svh min-h-0 overflow-hidden">
+            <Navbar />
+            <SidebarInset className="h-full min-h-0 overflow-hidden">
+                <TopNav />
+                <GlobalErrorBanner />
+                <main className="flex min-h-0 flex-1 flex-col overflow-hidden" id="mainContent">
+                    <Outlet />
                 </main>
-            </div>
-        </div>
+            </SidebarInset>
+        </SidebarProvider>
     )
 }

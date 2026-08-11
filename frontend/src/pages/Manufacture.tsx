@@ -9,7 +9,6 @@ import {
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
-    TOOLBAR_BUTTON,
 } from "@/lib/styles";
 import { useManufactureCatalog, useProductCatalog } from "@/hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
@@ -17,6 +16,8 @@ import {
     EditManufacture,
     type EditManufactureHandle,
 } from "@/components/manufacture/EditManufacture";
+import { Button } from "@/components/ui/button";
+import { RefreshButton } from "@/components/RefreshButton";
 
 /** null = closed, -1 = new MO draft, number = editing MO id */
 type MOTarget = { moId: number } | null;
@@ -67,20 +68,15 @@ export const Manufacture = () => {
             title="製造管理"
             actions={
                 <>
-                    <button
+                    <Button
                         onClick={() => setMOTarget({ moId: -1 })}
                         className={PRIMARY_BUTTON}
                     >
                         <Plus width="14" height="14" />
                         新增工單
-                    </button>
+                    </Button>
 
-                    <button
-                        onClick={() => refetchManufactureOrders()}
-                        className={TOOLBAR_BUTTON}
-                    >
-                        重新整理工單
-                    </button>
+                    <RefreshButton label="重新整理工單" onClick={() => refetchManufactureOrders()} />
 
                     {/* Status Filter */}
                     <select

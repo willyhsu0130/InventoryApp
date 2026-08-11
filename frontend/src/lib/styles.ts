@@ -15,7 +15,7 @@ export const PRIMARY_BUTTON =
 
 /** Text/number/select control, used in both toolbars and modal forms. */
 export const CONTROL_INPUT =
-    "w-full h-9 bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded-lg px-3.5 py-1 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition";
+    "w-full h-9 bg-background border border-input focus:border-ring rounded-lg px-3.5 py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition";
 
 export const FIELD_LABEL = "text-xs text-slate-400 font-sans";
 

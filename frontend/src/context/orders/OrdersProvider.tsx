@@ -1,4 +1,4 @@
-import { convertSalesOrderToCreatePayload, convertSalesOrderToUpdatePayload, type KatanaSalesOrder, type KatanaSalesOrderDraft } from "@/models/katana/salesOrder";
+import { convertSalesOrderToCreatePayload, convertSalesOrderToUpdatePayload, type KatanaSalesOrder, type KatanaSalesOrderDraft, type UpdateSalesOrderRowPayload } from "@/models/katana/salesOrder";
 import { useCallback, useEffect, useState } from "react";
 import { OrdersContext } from "@/context/orders/OrdersContext";
 import { katanaFetch } from "@/lib/katanaFetch";
@@ -11,15 +11,22 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const { setErrorMessage } = useError();
 
     const refetchOrders = useCallback(async () => {
-        const ordersRes = await katanaFetch<KatanaSalesOrder[]>(KATANA_API_ROUTES.SALES_ORDERS);
+        setLoading(true);
+        try {
+            const ordersRes = await katanaFetch<KatanaSalesOrder[]>(KATANA_API_ROUTES.SALES_ORDERS);
 
-        if (ordersRes.success && Array.isArray(ordersRes.data)) {
-            const oMap = new Map<number, KatanaSalesOrder>();
-            ordersRes.data.forEach((i) => oMap.set(i.id, i));
-            setOrders(oMap);
-        } else {
-            console.log("Failed to sync orders data");
-            setErrorMessage("Failed to sync inventory data.");
+            if (!ordersRes.success) {
+                setErrorMessage(ordersRes.message);
+            } else if (Array.isArray(ordersRes.data)) {
+                const oMap = new Map<number, KatanaSalesOrder>();
+                ordersRes.data.forEach((i) => oMap.set(i.id, i));
+                setOrders(oMap);
+                setErrorMessage("");
+            } else {
+                setErrorMessage("Failed to sync orders data.");
+            }
+        } finally {
+            setLoading(false);
         }
     }, [setErrorMessage]);
 
@@ -78,35 +85,22 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return res.data;
     }, []);;
 
-    useEffect(() => {
-        let isMounted = true;
-        const loadInitialData = async () => {
-            const res = await katanaFetch<KatanaSalesOrder[]>(KATANA_API_ROUTES.SALES_ORDERS)
+    const updateOrderRow = useCallback(async (id: number, payload: UpdateSalesOrderRowPayload) => {
+        const res = await katanaFetch<void>(KATANA_API_ROUTES.SALES_ORDER_ROW_BY_ID(id), {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+        });
 
-            if (!isMounted) return;
-
-            if (res.success && Array.isArray(res.data)) {
-                // Turn katana variant into a map
-                const oMap = new Map<number, KatanaSalesOrder>();
-                res.data.forEach((o) => oMap.set(o.id, o));
-                setOrders(oMap);
-
-
-                // Error hadnling =
-                if (!res.success) {
-
-                    setErrorMessage("Failed to sync orders.");
-                }
-
-                setLoading(false);
-            };
-
-            return () => {
-                isMounted = false;
-            };
+        if (!res.success) {
+            throw new Error(res.message || "Failed to update sales order row.");
         }
-        loadInitialData();
-    }, [setErrorMessage]);
+    }, []);
+
+    useEffect(() => {
+        void (async () => {
+            await refetchOrders();
+        })();
+    }, [refetchOrders]);
 
     return (
         <OrdersContext.Provider
@@ -115,6 +109,7 @@ export const OrdersProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 refetchOrders,
                 loading,
                 editOrder,
+                updateOrderRow,
                 createOrder,
                 deleteOrder
             }}

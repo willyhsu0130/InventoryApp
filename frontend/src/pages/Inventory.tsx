@@ -9,11 +9,13 @@ import {
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
-    TOOLBAR_BUTTON,
 } from "../lib/styles";
 import { useInventoryCatalog } from "../hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { StockAdjustment, type StockAdjustmentHandle } from "@/components/inventory/StockAdjustment";
+import { Button } from "@/components/ui/button";
+import { RefreshButton } from "@/components/RefreshButton";
+import { InventorySectionNav } from "@/components/inventory/InventorySectionNav";
 
 /** null = closed, undefined variant = blank adjustment, number = prefilled row. */
 type AdjustmentTarget = { variantId: number | null } | null;
@@ -62,19 +64,18 @@ export const Inventory = () => {
         <PageLayout
             id="inventoryPage"
             title="庫存"
+            subnav={<InventorySectionNav />}
             actions={
                 <>
-                    <button
+                    <Button
                         onClick={() => setAdjustmentTarget({ variantId: null })}
                         className={PRIMARY_BUTTON}
                     >
                         <Plus width="14" height="14" />
                         調整庫存
-                    </button>
+                    </Button>
 
-                    <button onClick={() => refetchInventory()} className={TOOLBAR_BUTTON}>
-                        重新整理庫存
-                    </button>
+                    <RefreshButton label="重新整理庫存" onClick={() => refetchInventory()} />
 
                     <div className="w-full sm:w-80">
                         <input

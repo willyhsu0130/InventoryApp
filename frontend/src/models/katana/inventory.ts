@@ -52,11 +52,17 @@ export interface KatanaBatch {
     id: number;
     batch_number: string;
     variant_id: number;
+    location_id?: number;
+    quantity_in_stock?: string;
     expiration_date?: string | null;
     batch_created_date?: string | null;
     batch_barcode?: string | null;
     created_at: string;
     updated_at: string;
+}
+
+export interface KatanaBatchStock extends Omit<KatanaBatch, "id"> {
+    batch_id: number;
 }
 
 export interface KatanaCreateBatchInput {
