@@ -230,7 +230,7 @@ export const EditManufacture = ({
                             <Layers className="w-4 h-4 text-primary" />
                             <span>
                                 {traceability.length > 0 && traceability[0].batch_id
-                                    ? `已指派批號名稱: ${batch.get(traceability[0].batch_id)?.batch_number ?? traceability[0].batch_id}
+                                    ? `已指派批號名稱: ${batch.get(traceability[0].batch_id)?.batch_number ?? traceability[0].batch_id}`
                                     : "此商品需追蹤批號 (Batch Tracked)"}
                             </span>
                         </div>

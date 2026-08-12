@@ -92,7 +92,7 @@ export const Manufacture = () => {
                     </select>
 
                     {/* Search Input */}
-                    <div className="w-full sm:w-72">
+                    <div className="w-full min-w-xl sm:w-72">
                         <input
                             type="text"
                             placeholder="搜尋工單編號, 商品名稱, 或備註..."

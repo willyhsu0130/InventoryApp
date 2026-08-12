@@ -7,6 +7,7 @@ interface OrdersTableProps {
     items: KatanaSalesOrder[];
     /** Callback fired when clicking an order row. */
     onRowClick?: (orderId: number) => void;
+    visibleColumns?: Record<string, boolean>;
 }
 
 /** Render styled badges for sales order status */
@@ -47,9 +48,11 @@ const renderStatusBadge = (status: KatanaSalesOrderStatus) => {
     }
 };
 
-export const OrdersTable = ({ items, onRowClick }: OrdersTableProps) => {
-    const columns: Column<KatanaSalesOrder>[] = [
+export const OrdersTable = ({ items, onRowClick, visibleColumns }: OrdersTableProps) => {
+    // Define all possible columns with matching IDs
+    const allColumns: (Column<KatanaSalesOrder> & { id: string })[] = [
         {
+            id: "orderNo",
             header: "訂單編號",
             render: (order) => (
                 <span className="font-mono font-medium text-slate-100 text-sm">
@@ -58,11 +61,13 @@ export const OrdersTable = ({ items, onRowClick }: OrdersTableProps) => {
             ),
         },
         {
+            id: "status",
             header: "狀態",
             align: "center",
             render: (order) => renderStatusBadge(order.status),
         },
         {
+            id: "deliveryDate",
             header: "預計交貨日",
             render: (order) => (
                 <span className="text-slate-400 text-xs font-mono">
@@ -73,6 +78,7 @@ export const OrdersTable = ({ items, onRowClick }: OrdersTableProps) => {
             ),
         },
         {
+            id: "itemCount",
             header: "項目數量",
             align: "center",
             render: (order) => {
@@ -89,6 +95,7 @@ export const OrdersTable = ({ items, onRowClick }: OrdersTableProps) => {
             },
         },
         {
+            id: "total",
             header: "訂單總額",
             align: "right",
             render: (order) => {
@@ -106,6 +113,7 @@ export const OrdersTable = ({ items, onRowClick }: OrdersTableProps) => {
             },
         },
         {
+            id: "createdAt",
             header: "建立時間",
             align: "right",
             render: (order) => (
@@ -118,11 +126,16 @@ export const OrdersTable = ({ items, onRowClick }: OrdersTableProps) => {
         },
     ];
 
+    // Filter columns based on visibleColumns prop (defaults to visible if prop isn't passed)
+    const activeColumns = allColumns.filter(
+        (col) => visibleColumns?.[col.id] ?? true
+    );
+
     return (
         <div className="flex flex-col gap-y-3 h-full min-h-0">
             <DataTable
                 data={items}
-                columns={columns}
+                columns={activeColumns}
                 keyExtractor={(order) => order.id.toString()}
                 onRowClick={onRowClick ? (order) => onRowClick(order.id) : undefined}
                 emptyMessage="找不到符合條件的訂單。"

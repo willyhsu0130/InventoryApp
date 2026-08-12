@@ -67,10 +67,12 @@ async function forwardToKatana(req: Request, targetPath: string) {
     return response.json();
 }
 
-// 🔄 Catch-all wildcard endpoint for all `/api/*` routes and HTTP verbs
 app.all('/api/*splat', async (req: Request, res: Response) => {
     console.log("----------------------------------------");
-    console.log("req body", req.body)
+    if (req.body) {
+        console.log("req body", req.body)
+    }else console.log("No body in request")
+
     // Extract everything that comes after '/api' (e.g., '/inventory', '/products/123')
     const targetPath = req.path.replace(/^\/api/, '');
     console.log(targetPath)
@@ -78,7 +80,7 @@ app.all('/api/*splat', async (req: Request, res: Response) => {
         const data = await forwardToKatana(req, targetPath);
         res.json(data);
     } catch (error: any) {
-        console.error(`❌ Katana Proxy Error on [${req.method} /api${targetPath}]:`, error);
+        console.error(`Katana Proxy Error on [${req.method} /api${targetPath}]:`, error);
 
         const statusCode = error.status || 500;
         res.status(statusCode).json({

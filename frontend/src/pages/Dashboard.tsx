@@ -15,6 +15,15 @@ const sectionLinks = {
     manufacture: "/manufacture",
 } as const
 
+const ORDER_VISIBLE_COLUMNS: Record<string, boolean> = {
+    orderNo: true,
+    status: false,
+    deliveryDate: false,
+    itemCount: true,
+    total: true,
+    createdAt: false,
+};
+
 export const Dashboard = () => {
     const { inventory } = useInventoryCatalog()
     const { orders } = useOrdersCatalog()
@@ -58,7 +67,7 @@ export const Dashboard = () => {
 
                 <div className="grid gap-6 xl:grid-cols-2">
                     <DashboardSection title="訂單總覽" description="最近的銷售訂單" href={sectionLinks.orders}>
-                        <OrdersTable items={ordersList} />
+                        <OrdersTable items={ordersList} visibleColumns={ORDER_VISIBLE_COLUMNS} />
                     </DashboardSection>
                     <DashboardSection title="庫存預警" description="目前庫存狀態" href={sectionLinks.inventory}>
                         <InventoryTable items={inventoryList} />
