@@ -17,6 +17,7 @@ import { CustomersProvider } from "./context/customers/CustomersProvider"
 import { Customers } from "./pages/Customers"
 import { ManufactureProvider } from "./context/manufacture/ManufactureProvider"
 import { TooltipProvider } from "./components/ui/tooltip"
+import Login from "./pages/Login"
 
 // Helper component to keep App.tsx clean
 const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -41,6 +42,7 @@ export default function App() {
     <AppProviders>
       <BrowserRouter>
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route element={<MainLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />

@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './authRoutes'; // 👈 1. Import your auth router
 
 dotenv.config();
 
@@ -17,6 +18,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
 }));
+
+// 👈 2. Mount your Auth API routes BEFORE the Katana catch-all proxy!
+app.use('/api/auth', authRoutes);
 
 // Dynamic proxy function handling all HTTP methods & body payloads
 async function forwardToKatana(req: Request, targetPath: string) {
@@ -51,7 +55,7 @@ async function forwardToKatana(req: Request, targetPath: string) {
             ? req.body
             : JSON.stringify(req.body);
     }
-    console.log(options)
+    console.log(options);
     const response = await fetch(url, options);
 
     if (!response.ok) {
@@ -67,15 +71,16 @@ async function forwardToKatana(req: Request, targetPath: string) {
     return response.json();
 }
 
+// 👈 3. The Katana catch-all wildcard proxy handles any other /api/* route
 app.all('/api/*splat', async (req: Request, res: Response) => {
     console.log("----------------------------------------");
     if (req.body) {
-        console.log("req body", req.body)
-    }else console.log("No body in request")
+        console.log("req body", req.body);
+    } else console.log("No body in request");
 
     // Extract everything that comes after '/api' (e.g., '/inventory', '/products/123')
     const targetPath = req.path.replace(/^\/api/, '');
-    console.log(targetPath)
+    console.log(targetPath);
     try {
         const data = await forwardToKatana(req, targetPath);
         res.json(data);
