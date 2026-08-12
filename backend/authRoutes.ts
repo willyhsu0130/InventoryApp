@@ -1,16 +1,30 @@
 import express, { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
 
 const router = express.Router();
 
-// Initialize Supabase with Service Role Key (allows backend to bypass RLS safely)
 const supabase = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY!
 );
 
-// --- 1. REGISTER USER ---
+const getEmailFromUsername = (username: string) =>
+  username.includes('@') ? username : `${username}@example.com`;
+
+async function findEmailForUsername(username: string): Promise<string | null> {
+  if (username.includes('@')) return username;
+
+  const { data, error } = await supabase.auth.admin.listUsers({ limit: 100 });
+  if (error || !data?.users) {
+    console.error('Error listing users for username lookup', error);
+    return null;
+  }
+
+  const found = data.users.find((user) => user.user_metadata?.username === username);
+  return found?.email ?? null;
+}
+
 router.post('/register', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -18,31 +32,32 @@ router.post('/register', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
-  try {
-    // Hash password before saving
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+  const email = getEmailFromUsername(username);
 
-    const { data, error } = await supabase
-      .from('app_users')
-      .insert([{ username, password_hash: hashedPassword }])
-      .select('id, username, created_at')
-      .single();
+  try {
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { username },
+    });
 
     if (error) {
-      if (error.code === '23505') {
-        return res.status(409).json({ error: 'Username already taken' });
-      }
-      return res.status(400).json({ error: error.message });
+      const message =
+        error.message || 'Unable to create user account. Please try again.';
+      const conflict = message.toLowerCase().includes('already');
+      return res.status(conflict ? 409 : 400).json({ error: message });
     }
 
-    return res.status(201).json({ message: 'User created successfully', user: data });
+    return res
+      .status(201)
+      .json({ message: 'User created successfully', user: data.user });
   } catch (err) {
+    console.error('Register error', err);
     return res.status(500).json({ error: 'Server error' });
   }
 });
 
-// --- 2. LOGIN USER ---
 router.post('/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -51,29 +66,49 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 
   try {
-    // Fetch user by username
-    const { data: user, error } = await supabase
-      .from('app_users')
-      .select('*')
-      .eq('username', username)
-      .single();
+    const email = username.includes('@')
+      ? username
+      : await findEmailForUsername(username);
 
-    if (error || !user) {
+    if (!email) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    // Compare provided password with hashed password
-    const isMatch = await bcrypt.compare(password, user.password_hash);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    if (!isMatch) {
+    if (error || !data?.user || !data.session) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
+
+    const user = data.user;
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('JWT_SECRET is not set in environment');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
+    const token = jwt.sign(
+      {
+        sub: user.id,
+        username: user.user_metadata?.username ?? user.email,
+      },
+      jwtSecret,
+      { expiresIn: '1h' }
+    );
 
     return res.status(200).json({
       message: 'Login successful',
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.user_metadata?.username ?? user.email,
+      },
+      token,
     });
   } catch (err) {
+    console.error('Login error', err);
     return res.status(500).json({ error: 'Server error' });
   }
 });
