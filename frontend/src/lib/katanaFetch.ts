@@ -1,5 +1,11 @@
 // src/lib/katanaClient.ts
-const BACKEND_URL = "http://localhost:3000/api";
+export const BACKEND_URL = "http://localhost:3000/api";
+const AUTH_TOKEN_STORAGE_KEY = "auth_token";
+
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
 
 export interface KatanaErrorDetail {
   path?: string;
@@ -32,15 +38,24 @@ export const katanaFetch = async <T>(
   options?: RequestInit
 ): Promise<KatanaResponse<T>> => {
   try {
+    const token = getAuthToken();
+    if (!token) {
+      return {
+        success: false,
+        message: "Not authenticated",
+        statusCode: 401,
+      };
+    }
+
     const cleanBase = BACKEND_URL.replace(/\/+$/, ""); // Strip trailing slashes
     const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     const url = endpoint.startsWith("http")
       ? endpoint
       : `${cleanBase}${cleanEndpoint}`;
 
-    console.log(url)
     const headers: HeadersInit = {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
       ...options?.headers,
     };
 

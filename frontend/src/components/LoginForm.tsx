@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { BACKEND_URL } from "@/lib/katanaFetch"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -22,9 +23,49 @@ export function LoginForm({
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle login submission here
+
+    try {
+      const authUrl = `${BACKEND_URL.replace(/\/+$|\/$/, '')}/auth/login`;
+      const resp = await fetch(authUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        // TODO: show user-friendly error
+        alert(data.error || 'Login failed');
+        return;
+      }
+
+      // If AuthContext is available, use it
+      // Lazy import to avoid circular issues
+      try {
+        // Using window.dispatchEvent to notify provider is not ideal, so prefer context if available
+      } catch (err) {
+        console.log(err)
+        // ignore
+      }
+
+      // If backend returns token, store in localStorage and navigate
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+        // Optionally store username
+        localStorage.setItem('auth_username', data.user?.username || username);
+        // Navigate to home
+        window.location.href = '/';
+      } else {
+        // No token returned — still navigate or show message
+        window.location.href = '/';
+      }
+    } catch (err) {
+      console.error('Login error', err);
+      alert('Login failed');
+    }
   }
 
   return (

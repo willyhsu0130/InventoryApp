@@ -18,23 +18,27 @@ import { Customers } from "./pages/Customers"
 import { ManufactureProvider } from "./context/manufacture/ManufactureProvider"
 import { TooltipProvider } from "./components/ui/tooltip"
 import Login from "./pages/Login"
+import { AuthProvider } from "./context/AuthProvider"
 
 // Helper component to keep App.tsx clean
 const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <TooltipProvider><ErrorProvider>
-    <CustomersProvider>
-      <ManufactureProvider>
-        <ProductProvider>
-          <InventoryProvider>
-            <OrdersProvider>
-              {children}
-            </OrdersProvider>
-          </InventoryProvider>
-        </ProductProvider>
-      </ManufactureProvider>
-    </CustomersProvider>
-  </ErrorProvider></TooltipProvider>
-
+  <TooltipProvider>
+    <ErrorProvider>
+      <AuthProvider>
+        <CustomersProvider>
+          <ManufactureProvider>
+            <ProductProvider>
+              <InventoryProvider>
+                <OrdersProvider>
+                  {children}
+                </OrdersProvider>
+              </InventoryProvider>
+            </ProductProvider>
+          </ManufactureProvider>
+        </CustomersProvider>
+      </AuthProvider>
+    </ErrorProvider>
+  </TooltipProvider>
 );
 
 export default function App() {
