@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
-const dotenv = require('dotenv');
-const express = require('express');
-const cors = require('cors');
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
-const authRoutes = require('./authRoutes').default; // 👈 1. Import your auth router after env loads
+import authRoutes from "./authRoutes.js"
 
 const app = express();
 const PORT = process.env.PORT || 3000;
