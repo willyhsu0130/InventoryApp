@@ -2,7 +2,7 @@ import { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import AuthContext from "@/context/AuthContext";
+import {AuthContext} from "@/context/AuthContext";
 
 export const Settings = () => {
   const authContext = useContext(AuthContext);
@@ -30,7 +30,7 @@ export const Settings = () => {
               type="button"
               variant="outline"
               onClick={handleLogout}
-              disabled={!authContext?.isAuthenticated}
+              // disabled={!authContext?.isAuthenticated}
               className="text-foreground"
             >
               登出

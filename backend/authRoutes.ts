@@ -15,7 +15,7 @@ const getEmailFromUsername = (username: string) =>
 async function findEmailForUsername(username: string): Promise<string | null> {
   if (username.includes('@')) return username;
 
-  const { data, error } = await supabase.auth.admin.listUsers({ limit: 100 });
+  const { data, error } = await supabase.auth.admin.listUsers();
   if (error || !data?.users) {
     console.error('Error listing users for username lookup', error);
     return null;

@@ -33,7 +33,7 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
     return (
         <div
-            className="relative flex h-full min-h-0 min-w-0 w-full overflow-hidden overscroll-contain rounded-md border bg-card [&_td]:text-foreground [&_.text-slate-100]:!text-foreground [&_.text-slate-200]:!text-foreground [&_.text-slate-300]:!text-foreground [&_.text-slate-400]:!text-muted-foreground [&_.text-slate-500]:!text-muted-foreground"
+            className="relative flex h-full min-h-0 min-w-0 w-full overflow-hidden overscroll-contain rounded-md border bg-card [&_td]:text-foreground [&_.text-slate-100]:text-foreground! [&_.text-slate-200]:text-foreground! [&_.text-slate-300]:text-foreground! [&_.text-slate-400]:text-muted-foreground! [&_.text-slate-500]:text-muted-foreground!"
             id="dataTable"
         >
             <Table>
