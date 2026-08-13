@@ -21,7 +21,7 @@ import { RefreshButton } from "@/components/RefreshButton";
 type CustomerTarget = { customerId: number } | null;
 
 export const Customers = () => {
-    const { customers, loading, refetchCustomers } = useCustomersCatalog();
+    const { customers, loading, refetchCustomers, deleteCustomer } = useCustomersCatalog();
 
     const { errorMessage } = useError();
     const [searchTerm, setSearchTerm] = useState<string>("");
@@ -34,6 +34,13 @@ export const Customers = () => {
         return Array.from(customers.values());
     }, [customers]);
 
+    const handleDeleteCustomer = () => {
+        const customerId = customerTarget?.customerId
+        if (!customerId) return
+
+        deleteCustomer(customerId)
+
+    }
     // Filter across Name, Company, Email, Phone, and Comment
     const filteredItems = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
@@ -107,6 +114,7 @@ export const Customers = () => {
                 onClose={() => setCustomerTarget(null)}
                 isSaving={isSaving}
                 onSave={() => editCustomerRef.current?.submit()}
+                onDelete={handleDeleteCustomer}
             >
                 {customerTarget && (
                     <EditCustomer
@@ -117,6 +125,6 @@ export const Customers = () => {
                     />
                 )}
             </EditModal>
-        </PageLayout>
+        </PageLayout >
     );
 };

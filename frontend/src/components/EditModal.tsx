@@ -69,7 +69,7 @@ export const EditModal = ({
                                         onClick={onDelete}
                                     >
                                         <Trash2 className="h-4 w-4" />
-                                        刪除產品
+                                        刪除
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
