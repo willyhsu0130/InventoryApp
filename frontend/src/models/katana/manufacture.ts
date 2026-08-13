@@ -194,7 +194,7 @@ export const convertMOToUpdatePayload = (
         ...(draft.status && { status: draft.status }),
         ...(draft.status === "DONE" && {
             actual_quantity: draft.actual_quantity,
-            done_date: draft.done_date,
+            // done_date: draft.done_date,
         }),
         ...(draft.variant_id != null && { variant_id: draft.variant_id }),
         ...(draft.location_id != null && { location_id: draft.location_id }),
@@ -205,3 +205,96 @@ export const convertMOToUpdatePayload = (
         ...(cleanTraceability?.length && { traceability: cleanTraceability }),
     };
 };
+
+/**
+ * Compares an existing KatanaManufacturingOrder against an incoming draft
+ * and extracts ONLY the fields that have actually changed.
+ */
+/**
+ * Compares an existing KatanaManufacturingOrder against an incoming draft
+ * and extracts ONLY the fields that have actually changed.
+ */
+/**
+ * Compares an existing KatanaManufacturingOrder against an incoming draft
+ * and extracts ONLY the fields that have actually changed.
+ */
+export function getMODiffPayload(
+    original: KatanaManufacturingOrder,
+    draft: Partial<KatanaManufacturingOrderDraft>
+): UpdateManufacturingOrderPayload {
+    const diff: UpdateManufacturingOrderPayload = {};
+
+    // 1. Variant ID
+    if (draft.variant_id != null && draft.variant_id !== original.variant_id) {
+        diff.variant_id = draft.variant_id;
+    }
+
+    // 2. Location ID
+    if (draft.location_id != null && draft.location_id !== original.location_id) {
+        diff.location_id = draft.location_id;
+    }
+
+    // 3. Planned Quantity
+    if (draft.planned_quantity !== undefined && draft.planned_quantity !== original.planned_quantity) {
+        diff.planned_quantity = draft.planned_quantity;
+    }
+
+    // 4. Actual Quantity (null check / non-null conversion)
+    if (draft.actual_quantity !== undefined && draft.actual_quantity !== original.actual_quantity) {
+        if (draft.actual_quantity !== null) {
+            diff.actual_quantity = draft.actual_quantity;
+        }
+    }
+
+    // 5. Status
+    if (draft.status !== undefined && draft.status !== original.status) {
+        diff.status = draft.status;
+    }
+
+    // 6. Order Number
+    if (draft.order_no !== undefined) {
+        const cleanDraftOrderNo = draft.order_no?.trim() ?? "";
+        const cleanOrigOrderNo = original.order_no?.trim() ?? "";
+        if (cleanDraftOrderNo !== cleanOrigOrderNo) {
+            diff.order_no = cleanDraftOrderNo;
+        }
+    }
+
+    // 7. Production Deadline Date
+    if (draft.production_deadline_date !== undefined) {
+        const cleanDraftDate = draft.production_deadline_date || undefined;
+        const cleanOrigDate = original.production_deadline_date || undefined;
+        if (cleanDraftDate !== cleanOrigDate) {
+            if (cleanDraftDate) {
+                diff.production_deadline_date = cleanDraftDate;
+            }
+        }
+    }
+
+    // 8. Done Date
+    if (draft.done_date !== undefined && draft.done_date !== original.done_date) {
+        if (draft.done_date) {
+            diff.done_date = draft.done_date;
+        }
+    }
+
+    // 9. Additional Info (Safely handle null + trim)
+    if (draft.additional_info !== undefined) {
+        const cleanDraftInfo = typeof draft.additional_info === "string" ? draft.additional_info.trim() : "";
+        const cleanOrigInfo = original.additional_info?.trim() ?? "";
+        if (cleanDraftInfo !== cleanOrigInfo) {
+            diff.additional_info = cleanDraftInfo;
+        }
+    }
+
+    // 10. Traceability
+    if (draft.traceability !== undefined) {
+        const draftTraceability = JSON.stringify(draft.traceability);
+        const originalTraceability = JSON.stringify(original.traceability ?? []);
+        if (draftTraceability !== originalTraceability) {
+            diff.traceability = draft.traceability;
+        }
+    }
+
+    return diff;
+}

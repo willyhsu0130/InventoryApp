@@ -150,7 +150,9 @@ export const EditManufacture = ({
                 }),
                 // Only include deadline date if user explicitly picked one AND we aren't restricted
                 // Omit production_deadline_date when automatic deadline management is enabled in Katana
-                // production_deadline_date: deadlineDate ? deadlineDate.toISOString() : undefined,
+                ...(deadlineDate && {
+                    production_deadline_date: deadlineDate.toISOString(),
+                }),
                 additional_info: additionalInfo.trim() || undefined,
                 traceability: traceability.length > 0 ? traceability : undefined,
             };

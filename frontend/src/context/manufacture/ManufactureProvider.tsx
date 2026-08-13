@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
     convertMOToCreatePayload,
     convertMOToUpdatePayload,
+    getMODiffPayload,
     type KatanaManufacturingOrder,
     type KatanaManufacturingOrderDraft,
 } from "@/models/katana/manufacture";
@@ -62,15 +63,32 @@ export const ManufactureProvider: React.FC<{ children: React.ReactNode }> = ({
 
     // 3. EDIT / UPDATE MANUFACTURING ORDER (PATCH)
     const editMO = useCallback(
-        async (id: number, draft: Partial<KatanaManufacturingOrderDraft>) => {
-            const payload = convertMOToUpdatePayload(draft);
+        async (id: number, draft: Partial<KatanaManufacturingOrderDraft>): Promise<KatanaManufacturingOrder> => {
+            console.log(draft)
+            const existingMO = manufactureOrders.get(id);
+            if (!existingMO) {
+                const msg = `Manufacturing order #${id} not found.`;
+                setErrorMessage(msg);
+                throw new Error(msg);
+            }
+
+            const rawPayload = convertMOToUpdatePayload(draft);
+            const diffPayload = getMODiffPayload(existingMO, rawPayload);
+            console.log(diffPayload)
+
+            // Early exit: If nothing actually changed, skip the API call
+            if (Object.keys(diffPayload).length === 0) {
+                console.log(`[editMO] MO #${id} 沒有變更，跳過 API 請求。`);
+                return existingMO;
+            }
+
             const endpoint = KATANA_API_ROUTES.MANUFACTURING_ORDER_BY_ID
                 ? KATANA_API_ROUTES.MANUFACTURING_ORDER_BY_ID(id)
                 : `${KATANA_API_ROUTES.MANUFACTURING_ORDERS}/${id}`;
 
             const res = await katanaFetch<KatanaManufacturingOrder>(endpoint, {
                 method: "PATCH",
-                body: JSON.stringify(payload),
+                body: JSON.stringify(diffPayload),
             });
 
             if (!res.success || !res.data) {
@@ -80,9 +98,11 @@ export const ManufactureProvider: React.FC<{ children: React.ReactNode }> = ({
             }
 
             setManufactureOrders((prev) => new Map(prev).set(res.data.id, res.data));
+
+            // Guaranteed to be KatanaManufacturingOrder
             return res.data;
         },
-        [setErrorMessage]
+        [setErrorMessage, manufactureOrders]
     );
 
     // 4. DELETE MANUFACTURING ORDER (DELETE 204)

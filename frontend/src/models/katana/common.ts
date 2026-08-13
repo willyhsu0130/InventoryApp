@@ -38,3 +38,29 @@ export interface KatanaLocation {
   updated_at: string;
   deleted_at?: string | null;
 }
+
+
+/**
+ * Safely compares two date representations (ISO strings, Date objects, or undefined/null).
+ * Returns true if both represent the exact same calendar date/timestamp.
+ */
+export function isSameDate(
+    dateA?: string | null,
+    dateB?: string | null
+): boolean {
+    // Both empty / null / undefined -> considered identical
+    if (!dateA && !dateB) return true;
+    if (!dateA || !dateB) return false;
+
+    // Fast string match
+    if (dateA === dateB) return true;
+
+    // Parse and compare timestamps
+    const timeA = new Date(dateA).getTime();
+    const timeB = new Date(dateB).getTime();
+
+    // If either parsed to NaN (invalid date), fall back to strict inequality
+    if (isNaN(timeA) || isNaN(timeB)) return dateA === dateB;
+
+    return timeA === timeB;
+}
