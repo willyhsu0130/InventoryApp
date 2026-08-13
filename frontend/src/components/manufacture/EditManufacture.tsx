@@ -38,7 +38,7 @@ export const EditManufacture = ({
 }: EditManufactureProps) => {
     const isCreating = id === -1;
 
-    const { manufactureOrders, createMO, editMO } = useManufactureCatalog();
+    const { manufactureOrders, createMO, editMO} = useManufactureCatalog();
     const { products, getVariantDetails } = useProductCatalog();
     const { batch } = useInventoryCatalog()
 

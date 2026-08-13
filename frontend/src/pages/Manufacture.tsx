@@ -23,7 +23,7 @@ import { RefreshButton } from "@/components/RefreshButton";
 type MOTarget = { moId: number } | null;
 
 export const Manufacture = () => {
-    const { manufactureOrders, loading, refetchManufactureOrders } =
+    const { manufactureOrders, loading, refetchManufactureOrders, deleteMO } =
         useManufactureCatalog();
     const { getVariantDetails } = useProductCatalog();
 
@@ -39,6 +39,13 @@ export const Manufacture = () => {
         return Array.from(manufactureOrders.values());
     }, [manufactureOrders]);
 
+    const handleDelete = async () => {
+        if (!moTarget) return
+        setIsSaving(true)
+        await deleteMO(moTarget?.moId)
+        setIsSaving(false)
+        setMOTarget(null)
+    }
     // Filter by search term (Order No, Product Name, Notes) and Status
     const filteredItems = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
@@ -125,6 +132,7 @@ export const Manufacture = () => {
                 onClose={() => setMOTarget(null)}
                 isSaving={isSaving}
                 onSave={() => editManufactureRef.current?.submit()}
+                onDelete={handleDelete}
             >
                 {moTarget && (
                     <EditManufacture
