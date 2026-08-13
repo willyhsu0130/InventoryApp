@@ -40,6 +40,7 @@ export const Customers = () => {
 
         deleteCustomer(customerId)
 
+        setCustomerTarget(null)
     }
     // Filter across Name, Company, Email, Phone, and Comment
     const filteredItems = useMemo(() => {

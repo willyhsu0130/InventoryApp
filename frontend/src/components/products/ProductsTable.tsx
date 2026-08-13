@@ -76,7 +76,7 @@ export const ProductsTable = ({ items, onRowClick }: ProductsTableProps) => {
     ];
 
     return (
-        <div className="h-full min-h-0 flex flex-col overflow-hidden rounded-xl border border-slate-800">
+        <div className="h-full min-h-0 flex flex-col overflow-hidden rounded-xl">
             <DataTable
                 data={items}
                 columns={columns}
