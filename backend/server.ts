@@ -15,7 +15,7 @@ const KATANA_BASE_URL = 'https://api.katanamrp.com/v1';
 app.use(express.json());
 
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'],
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174', "https://inventory.willyhsu0130.com/" ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -72,7 +72,7 @@ async function forwardToKatana(req: Request, targetPath: string) {
     return response.json();
 }
 
-// 👈 3. The Katana catch-all wildcard proxy handles any other /api/* route
+// The Katana catch-all wildcard proxy handles any other /api/* route
 app.all('/api/*splat', async (req: Request, res: Response) => {
     console.log("----------------------------------------");
     if (req.body) {
@@ -97,5 +97,5 @@ app.all('/api/*splat', async (req: Request, res: Response) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
+    console.log(`Server running at http://localhost:${PORT}`);
 });

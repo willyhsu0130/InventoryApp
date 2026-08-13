@@ -19,6 +19,7 @@ import { ManufactureProvider } from "./context/manufacture/ManufactureProvider"
 import { TooltipProvider } from "./components/ui/tooltip"
 import Login from "./pages/Login"
 import { AuthProvider } from "./context/AuthProvider"
+import { ProtectedRoute } from "./components/ProtectedRoute"
 
 // Helper component to keep App.tsx clean
 const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -47,16 +48,19 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/inventory/batches" element={<InventoryBatches />} />
-            <Route path="/manufacture" element={<Manufacture />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/customers" element={<Customers />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/inventory/batches" element={<InventoryBatches />} />
+              <Route path="/manufacture" element={<Manufacture />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/customers" element={<Customers />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

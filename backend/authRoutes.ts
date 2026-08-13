@@ -1,8 +1,12 @@
 import express, {type  Request, type Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
 
 const router = express.Router();
+console.log(process.env.SUPABASE_URL)
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,

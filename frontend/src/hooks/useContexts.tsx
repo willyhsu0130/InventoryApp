@@ -8,6 +8,7 @@ import { InventoryContext } from "../context/InventoryContext";
 import { OrdersContext } from "@/context/orders/OrdersContext"
 import { CustomersContext } from "@/context/customers/CustomersContext";
 import { ManufactureContext } from "@/context/manufacture/ManufactureContext";
+import { AuthContext } from "@/context/AuthContext";
 
 export const useProductCatalog = () => {
     const context = useContext(ProductContext);
@@ -52,4 +53,14 @@ export const useManufactureCatalog = () => {
     return context;
 };
 
+
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error(
+            "useAuthCatalog must be used within a AuthProvider"
+        );
+    }
+    return context;
+};
 
