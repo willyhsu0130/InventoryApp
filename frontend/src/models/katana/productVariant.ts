@@ -462,3 +462,17 @@ export const convertProductToCreatePayload = (
         ...(cleanConfigs.length > 0 && { configs: cleanConfigs }),
     };
 };
+
+export interface KatanaCreateStandaloneVariantPayload extends KatanaCreateVariantPayload {
+    product_id: number;
+}
+
+export const convertVariantToCreatePayload = (
+    draft: KatanaProductDraftVariant,
+    productId: number
+): KatanaCreateStandaloneVariantPayload => {
+    return {
+        ...convertDraftVariantToCreatePayload(draft),
+        product_id: productId,
+    };
+};

@@ -1,4 +1,5 @@
 import { useImperativeHandle, useState } from "react";
+import { Plus, Settings, Trash2 } from "lucide-react";
 import { useInventoryCatalog, useProductCatalog } from "@/hooks/useContexts";
 import { EditModal } from "../EditModal";
 import { InlineInput } from "../InlineInput";
@@ -14,13 +15,22 @@ import {
     type KatanaProductConfig,
     type KatanaProductDraft,
     type KatanaProductDraftVariant,
+    type KatanaVariantConfigAttribute,
 } from "@/models/katana/productVariant";
+
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 /** Max length Katana enforces on `uom` and `purchase_uom`. */
 const UOM_MAX_LENGTH = 7;
 
 export interface EditProductHandle {
-    /** Persists an unsaved draft. No-op once the product exists (edits autosave). */
     submit: () => Promise<void>;
 }
 
@@ -33,8 +43,6 @@ interface EditProductProps {
 }
 
 export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductProps) => {
-    // -1 means "not in Katana yet": nothing can be PATCHed, so every change stays
-    // local until the single POST in handleCreate.
     const isCreating = isUnsavedProduct(id);
 
     const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -43,7 +51,16 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
     const [formError, setFormError] = useState<string | null>(null);
 
     // Contexts
-    const { products, editProduct, editVariant, createProduct, refetchProducts } = useProductCatalog();
+    const {
+        products,
+        editProduct,
+        editVariant,
+        createVariant,
+        createProduct,
+        refetchProducts,
+        deleteVariant,
+    } = useProductCatalog();
+
     const product = products.get(id);
     const [formProduct, setproduct] = useState<KatanaProductDraft>(
         () => products.get(id) ?? createEmptyProductDraft()
@@ -51,43 +68,80 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
     const { inventory } = useInventoryCatalog();
 
     /**
-     * Apply a change to one variant row, then persist it if that row already
-     * exists in Katana. Unsaved rows have no id to PATCH against.
+     * Persist variant changes:
+     * - If unsaved draft row (id === undefined): calls POST /variants when first modified.
+     * - If existing saved row (id !== undefined): calls PATCH /variants/{id}.
      */
     const commitVariantChange = async (
         variantIndex: number,
         patch: Partial<KatanaProductDraftVariant>
     ) => {
-        const targetVariant = formProduct.variants[variantIndex];
-        if (!targetVariant) return;
-
-        // 1. Optimistic UI update for immediate user feedback
-        const updatedVariant = { ...targetVariant, ...patch };
+        let updatedVariant: KatanaProductDraftVariant | null = null;
+        let previousVariant: KatanaProductDraftVariant | null = null;
 
         setproduct((prev) => {
-            const updatedVariants = [...prev.variants];
-            updatedVariants[variantIndex] = updatedVariant;
-            return { ...prev, variants: updatedVariants };
+            previousVariant = prev.variants[variantIndex] ?? null;
+            if (!previousVariant) return prev;
+
+            updatedVariant = { ...previousVariant, ...patch };
+            const nextVariants = [...prev.variants];
+            nextVariants[variantIndex] = updatedVariant;
+
+            return { ...prev, variants: nextVariants };
         });
 
-        // 2. Direct PATCH /variants/{id} via editVariant
-        const variantId = updatedVariant.id;
-        if (isCreating || variantId === undefined) return;
+        if (isCreating || !updatedVariant) return;
 
+        const currentTarget = updatedVariant as KatanaProductDraftVariant;
+
+        // Check if configs are all selected before calling POST /variants
+        const hasUnfilledConfigs = currentTarget.config_attributes.some(
+            (attr) => !attr.config_value || attr.config_value.trim() === ""
+        );
+
+        // If it's a new row without an ID and options are still unselected, keep it local only
+        if (currentTarget.id === undefined && hasUnfilledConfigs) {
+            return;
+        }
+
+        onSavingChange?.(true);
         try {
-            await editVariant({ ...updatedVariant, id: variantId });
+            if (currentTarget.id === undefined) {
+                // 1. All required dropdowns picked -> POST /variants
+                const created = await createVariant(currentTarget, id);
+
+                setproduct((prev) => {
+                    const nextVariants = [...prev.variants];
+                    nextVariants[variantIndex] = {
+                        ...currentTarget,
+                        id: created.id,
+                    };
+                    return { ...prev, variants: nextVariants };
+                });
+            } else {
+                // 2. Existing Katana variant -> PATCH /variants/{id}
+                await editVariant({
+                    ...currentTarget,
+                    id: currentTarget.id,
+                    product_id: id,
+                });
+            }
+
+            await refetchProducts();
         } catch (error) {
-            // Restore the previous value when the provider rejects the update.
-            setproduct((prev) => {
-                const variants = [...prev.variants];
-                variants[variantIndex] = targetVariant;
-                return { ...prev, variants };
-            });
-            setFormError(error instanceof Error ? error.message : "更新產品款式失敗。");
+            if (previousVariant) {
+                setproduct((prev) => {
+                    const nextVariants = [...prev.variants];
+                    nextVariants[variantIndex] = previousVariant!;
+                    return { ...prev, variants: nextVariants };
+                });
+            }
+            setFormError(error instanceof Error ? error.message : "儲存款式失敗。");
+        } finally {
+            onSavingChange?.(false);
         }
     };
 
-    // Product stuff — accepts string (text inputs) or boolean (radio/checkbox flags)
     const handleFieldChange = (
         field: keyof KatanaProductDraft,
         value: string | boolean
@@ -96,43 +150,38 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         setproduct((prev) => ({ ...prev, [field]: value }));
     };
 
-    /**
-     * Single source of truth for "does this product need a PATCH."
-     */
     const commitProductPatch = async (patch: Partial<KatanaProductDraft> = {}) => {
-        // 1. Always update local form state first
-        const updated = { ...formProduct, ...patch };
-        if (Object.keys(patch).length > 0) {
-            setproduct(updated);
-        }
+        let nextProduct: KatanaProductDraft;
 
-        // 2. Drafts don't send API requests yet; they wait for the submit handle
+        setproduct((prev) => {
+            nextProduct = { ...prev, ...patch };
+            return nextProduct;
+        });
+
         if (isCreating || !product) return;
 
-        // 3. Check if top-level fields actually changed before firing API call
         const hasChanges =
-            updated.name !== product.name ||
-            updated.uom !== product.uom ||
-            updated.batch_tracked !== product.batch_tracked ||
-            updated.serial_tracked !== product.serial_tracked;
+            nextProduct!.name !== product.name ||
+            nextProduct!.uom !== product.uom ||
+            nextProduct!.batch_tracked !== product.batch_tracked ||
+            nextProduct!.serial_tracked !== product.serial_tracked;
 
         if (!hasChanges) return;
 
         onSavingChange?.(true);
         try {
-            await editProduct(updated);
+            await editProduct(nextProduct!);
             await refetchProducts();
         } catch (err) {
             console.error("Failed auto-save:", err);
+            setFormError(err instanceof Error ? err.message : "自動儲存產品失敗。");
         } finally {
             onSavingChange?.(false);
         }
     };
 
-    // Kept for text inputs' onBlur — re-diffs current formProduct.
     const handleCommit = () => commitProductPatch();
 
-    /** Validates against the constraints POST /products enforces. */
     const validateDraft = (draft: KatanaProductDraft): string | null => {
         if (!draft.name.trim()) return "請輸入產品名稱。";
         if (draft.uom.trim().length > UOM_MAX_LENGTH) {
@@ -156,6 +205,7 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         onSavingChange?.(true);
         try {
             const created = await createProduct(formProduct);
+            await refetchProducts();
             onCreated?.(created.id);
         } catch (err) {
             console.error("Failed to create product:", err);
@@ -168,35 +218,39 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
 
     useImperativeHandle(ref, () => ({ submit: handleCreate }));
 
-    // Modal Handlers
     const handleSaveModal = async () => {
         if (!hasConfigChanges(formProduct.configs, draftConfigs)) {
             setModalOpen(false);
             return;
         }
 
+        const syncedVariants = syncDraftVariantsToConfigs(draftConfigs, formProduct.variants);
+
         if (isCreating) {
             setproduct((prev) => ({
                 ...prev,
                 configs: draftConfigs,
-                variants: syncDraftVariantsToConfigs(draftConfigs, prev.variants),
+                variants: syncedVariants,
             }));
             setModalOpen(false);
             return;
         }
 
         setIsSaving(true);
-
         try {
-            const updatedProduct = { ...formProduct, configs: draftConfigs };
+            const updatedProduct = {
+                ...formProduct,
+                configs: draftConfigs,
+                variants: syncedVariants,
+            };
 
             setproduct(updatedProduct);
             await editProduct(updatedProduct);
             await refetchProducts();
-
             setModalOpen(false);
         } catch (err) {
             console.error("Failed to save configs", err);
+            setFormError("更新規格失敗。");
         } finally {
             setIsSaving(false);
         }
@@ -229,7 +283,90 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
         });
     };
 
+    const handleVariantConfigChange = (
+        variantIndex: number,
+        configName: string,
+        newValue: string
+    ) => {
+        const targetVariant = formProduct.variants[variantIndex];
+        if (!targetVariant) return;
+
+        const currentAttributes = targetVariant.config_attributes ?? [];
+        const existingIndex = currentAttributes.findIndex(
+            (attr) => attr.config_name === configName
+        );
+
+        let updatedAttributes: KatanaVariantConfigAttribute[];
+
+        if (existingIndex >= 0) {
+            updatedAttributes = [...currentAttributes];
+            updatedAttributes[existingIndex] = {
+                config_name: configName,
+                config_value: newValue,
+            };
+        } else {
+            updatedAttributes = [
+                ...currentAttributes,
+                { config_name: configName, config_value: newValue },
+            ];
+        }
+
+        commitVariantChange(variantIndex, {
+            config_attributes: updatedAttributes,
+        });
+    };
+
+    /**
+     * Appends a local draft variant row.
+     * Doesn't POST to Katana until the user actually fills in values.
+     */
+    const handleAddVariant = () => {
+        const defaultAttributes: KatanaVariantConfigAttribute[] = formProduct.configs.map(
+            (config) => ({
+                config_name: config.name,
+                config_value: "",
+            })
+        );
+
+        const newVariantDraft: KatanaProductDraftVariant = {
+            sku: "",
+            sales_price: 0,
+            config_attributes: defaultAttributes,
+        };
+
+        setproduct((prev) => ({
+            ...prev,
+            variants: [...prev.variants, newVariantDraft],
+        }));
+    };
+
+    const handleDeleteVariant = async (variantIndex: number, variantId?: number) => {
+        if (formProduct.variants.length <= 1) {
+            setFormError("產品至少需要設定一個款式。");
+            return;
+        }
+
+        const remainingVariants = formProduct.variants.filter((_, idx) => idx !== variantIndex);
+        setproduct((prev) => ({ ...prev, variants: remainingVariants }));
+
+        // Only call delete API if it was already persisted to Katana
+        if (!isCreating && variantId !== undefined) {
+            onSavingChange?.(true);
+            try {
+                await deleteVariant(variantId);
+                await refetchProducts();
+            } catch (err) {
+                setproduct((prev) => ({ ...prev, variants: formProduct.variants }));
+                setFormError(err instanceof Error ? err.message : "刪除款式失敗。");
+            } finally {
+                onSavingChange?.(false);
+            }
+        }
+    };
+
     const variants = formProduct.variants;
+    // Check if there is already an unsaved draft row being edited
+    const hasUnsavedVariant = !isCreating && variants.some((v) => v.id === undefined);
 
     return (
         <div className="flex flex-col gap-y-5">
@@ -250,7 +387,6 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
 
             {/* Top Details Form */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Field 1: Name */}
                 <div className="flex flex-col gap-y-1 md:col-span-2">
                     <label className={FIELD_LABEL}>產品名稱</label>
                     <input
@@ -266,7 +402,6 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
                     />
                 </div>
 
-                {/* Field 2: Unit of Measure (UOM) */}
                 <div className="flex flex-col gap-y-1">
                     <label className={FIELD_LABEL}>單位 (UOM)</label>
                     <input
@@ -283,7 +418,6 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
                     />
                 </div>
 
-                {/* Field 3: Tracking mode radio group */}
                 <div className="flex flex-col gap-y-1 md:col-span-3">
                     <label className={FIELD_LABEL}>庫存追蹤模式</label>
                     <RadioGroup
@@ -351,11 +485,12 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
                             <th className="py-3 px-4">SKU</th>
                             <th className="py-3 px-4 text-right">銷售價格 ($)</th>
                             {!isCreating && <th className="py-3 px-4 text-right">庫存量</th>}
+                            <th className="py-3 px-4 text-right w-10"><Settings className="w-4 h-4 ml-auto" /></th>
                         </tr>
                     </thead>
                     <tbody className="font-mono text-xs">
                         {variants.map((variant, v_index) => (
-                            <tr key={variant.id ?? v_index} className="border-b border-border/60">
+                            <tr key={variant.id ?? `draft-${v_index}`} className="border-b border-border/60">
                                 {formProduct.configs.length > 0 ? (
                                     formProduct.configs.map((config, index) => {
                                         const productConfigsName = config.name;
@@ -365,7 +500,25 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
 
                                         return (
                                             <td className="py-2.5 px-4 font-sans font-medium text-foreground" key={index}>
-                                                {value}
+                                                <Select
+                                                    value={value ? value : undefined}
+                                                    onValueChange={(selectedVal) =>
+                                                        selectedVal && handleVariantConfigChange(v_index, config.name, selectedVal)
+                                                    }
+                                                >
+                                                    <SelectTrigger className="w-full h-8 text-xs bg-background">
+                                                        <SelectValue placeholder={`選擇${config.name}...`} />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectGroup>
+                                                            {config.values.map((val) => (
+                                                                <SelectItem key={val} value={val} className="text-xs">
+                                                                    {val}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectGroup>
+                                                    </SelectContent>
+                                                </Select>
                                             </td>
                                         );
                                     })
@@ -401,20 +554,40 @@ export const EditProduct = ({ id, onSavingChange, onCreated, ref }: EditProductP
                                             type="number"
                                             value={
                                                 variant.id != null &&
-                                                inventory.get(variant.id)?.quantity_in_stock != null
+                                                    inventory.get(variant.id)?.quantity_in_stock != null
                                                     ? Number(
-                                                          inventory.get(variant.id)?.quantity_in_stock
-                                                      ).toFixed(0)
+                                                        inventory.get(variant.id)?.quantity_in_stock
+                                                    ).toFixed(0)
                                                     : 0
                                             }
                                             readOnly
                                         />
                                     </td>
                                 )}
+                                <td className="py-2.5 px-4 text-right">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteVariant(v_index, variant.id)}
+                                        className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                                        title="刪除款式"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleAddVariant}
+                    disabled={hasUnsavedVariant}
+                    className="w-full justify-center rounded-t-none text-xs text-muted-foreground hover:bg-muted hover:text-foreground border-t border-border disabled:opacity-50"
+                >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    {hasUnsavedVariant ? "請先完成目前款式的設定" : "新增款式選項"}
+                </Button>
             </div>
         </div>
     );

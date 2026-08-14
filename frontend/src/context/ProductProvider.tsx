@@ -1,11 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import { katanaFetch } from "../lib/katanaFetch";
 import { ProductContext, type SavedDraftVariant } from "./ProductContext";
-import type { ResolvedVariantInfo } from "../models/katana/productVariant";
+import type { KatanaProductDraftVariant, ResolvedVariantInfo } from "../models/katana/productVariant";
 
 import {
     convertProductToCreatePayload,
     convertProductToPayload,
+    convertVariantToCreatePayload,
     convertVariantToPayload,
     type KatanaProduct,
     type KatanaProductDraft,
@@ -195,6 +196,44 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return savedVariant;
     }, [setErrorMessage]);
 
+
+    const deleteVariant = useCallback(async (id: number): Promise<void> => {
+        if (!id) return
+        const endpoint = KATANA_API_ROUTES.VARIANT_BY_ID(id)
+
+        const res = await katanaFetch<void>(endpoint, {
+            method: "DELETE",
+        });
+
+        if (!res.success) {
+            const message = res.message || "Failed to delete variant.";
+            setErrorMessage(message);
+            throw new Error(message);
+        }
+
+        // Update local variants map
+        setVariants((prev) => {
+            const next = new Map(prev);
+            next.delete(id);
+            return next;
+        });
+
+        // Update parent product's nested variants array
+        setProducts((prev) => {
+            const next = new Map(prev);
+            for (const [productId, product] of next.entries()) {
+                if (product.variants?.some((v) => v.id === id)) {
+                    next.set(productId, {
+                        ...product,
+                        variants: product.variants.filter((v) => v.id !== id),
+                    });
+                    break;
+                }
+            }
+            return next;
+        });
+    }, [setErrorMessage]);
+
     const createProduct = useCallback(async (draft: KatanaProductDraft): Promise<KatanaProduct> => {
         const payload = convertProductToCreatePayload(draft);
 
@@ -213,6 +252,44 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return res.data;
     }, [refetchProducts, setErrorMessage]);
 
+    const createVariant = useCallback(
+    async (draft: KatanaProductDraftVariant, productId: number): Promise<KatanaVariant> => {
+        const payload = convertVariantToCreatePayload(draft, productId);
+
+        const res = await katanaFetch<KatanaVariant>(KATANA_API_ROUTES.VARIANTS, {
+            method: "POST",
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.success || !res.data) {
+            const errorMsg = "Failed to create variant";
+            setErrorMessage(errorMsg);
+            throw new Error(errorMsg);
+        }
+
+        const createdVariant = res.data;
+
+        // 1. Sync variants map
+        setVariants((prev) => new Map(prev).set(createdVariant.id, createdVariant));
+
+        // 2. Sync parent product's nested variants array
+        setProducts((prev) => {
+            const next = new Map(prev);
+            const parent = next.get(productId);
+            if (parent) {
+                next.set(productId, {
+                    ...parent,
+                    variants: [...(parent.variants || []), createdVariant],
+                });
+            }
+            return next;
+        });
+
+        return createdVariant;
+    },
+    [setErrorMessage]
+);
+
     return (
         <ProductContext.Provider
             value={{
@@ -224,7 +301,9 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 editProduct,
                 editVariant,
                 createProduct,
+                createVariant,
                 deleteProduct,
+                deleteVariant
             }}
         >
             {children}

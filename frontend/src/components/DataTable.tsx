@@ -21,7 +21,7 @@ interface DataTableProps<T> {
     columns: Column<T>[];
     keyExtractor: (item: T) => string | number;
     emptyMessage?: string;
-    onRowClick?: (item: T) => void; 
+    onRowClick?: (item: T) => void;
 }
 
 export function DataTable<T>({
@@ -42,13 +42,12 @@ export function DataTable<T>({
                         {columns.map((col, idx) => (
                             <TableHead
                                 key={idx}
-                                className={`whitespace-nowrap text-xs uppercase tracking-wider ${
-                                    col.align === "right"
-                                        ? "text-right"
-                                        : col.align === "center"
+                                className={`whitespace-nowrap text-xs uppercase tracking-wider ${col.align === "right"
+                                    ? "text-right"
+                                    : col.align === "center"
                                         ? "text-center"
                                         : "text-left"
-                                } ${col.className || ""}`}
+                                    } ${col.className || ""}`}
                             >
                                 {col.header}
                             </TableHead>
@@ -68,22 +67,21 @@ export function DataTable<T>({
                     ) : (
                         data.map((item) => (
                             <TableRow
+                                id={String(keyExtractor(item))}
                                 key={keyExtractor(item)}
                                 onClick={() => onRowClick?.(item)}
-                                className={`${
-                                    onRowClick ? "cursor-pointer" : ""
-                                }`}
+                                className={`${onRowClick ? "cursor-pointer" : ""
+                                    }`}
                             >
                                 {columns.map((col, idx) => (
                                     <TableCell
                                         key={idx}
-                                        className={`whitespace-nowrap ${
-                                            col.align === "right"
-                                                ? "text-right"
-                                                : col.align === "center"
+                                        className={`whitespace-nowrap ${col.align === "right"
+                                            ? "text-right"
+                                            : col.align === "center"
                                                 ? "text-center"
                                                 : "text-left"
-                                        }`}
+                                            }`}
                                     >
                                         {col.render(item)}
                                     </TableCell>
@@ -93,6 +91,6 @@ export function DataTable<T>({
                     )}
                 </TableBody>
             </Table>
-        </div>
+        </div >
     );
 }

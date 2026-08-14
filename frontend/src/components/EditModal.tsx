@@ -1,6 +1,6 @@
 // src/components/common/EditModal.tsx
 import type { ReactNode } from "react";
-import { MoreVertical, Trash2, X } from "lucide-react";
+import { MoreVertical, Trash2, X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button"
 import {
     DropdownMenu,
@@ -15,6 +15,7 @@ interface EditModalProps {
     onClose: () => void;
     onSave: () => void | Promise<void>;
     onDelete?: () => void | Promise<void>;
+    onExport?: () => void | Promise<void>
     isSaving?: boolean;
     children: ReactNode;
     showSaveButton?: boolean;
@@ -26,12 +27,13 @@ export const EditModal = ({
     onClose,
     onSave,
     onDelete,
+    onExport,
     isSaving = false,
     showSaveButton = true,
     children,
 }: EditModalProps) => {
     if (!isOpen) return null;
-
+    const hasActions = Boolean(onDelete || onExport);
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
             <div
@@ -54,7 +56,7 @@ export const EditModal = ({
                                 <p className="text-sm text-muted-foreground">所有修改已儲存</p>
                         )}
                         {
-                            onDelete &&
+                            (hasActions) &&
                             <DropdownMenu>
                                 <DropdownMenuTrigger
                                     render={
@@ -63,14 +65,26 @@ export const EditModal = ({
                                         </Button>
                                     }
                                 />
+
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                        variant="destructive"
-                                        onClick={onDelete}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        刪除
-                                    </DropdownMenuItem>
+
+                                    {onExport && (
+                                        <DropdownMenuItem onClick={onExport} className="gap-2 cursor-pointer">
+                                            <Download className="h-4 w-4" />
+                                            <span>匯出</span>
+                                        </DropdownMenuItem>
+                                    )}
+
+                                    {onDelete && (
+                                        <DropdownMenuItem
+                                            variant="destructive"
+                                            onClick={onDelete}
+                                            className="gap-2 cursor-pointer"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            <span>刪除</span>
+                                        </DropdownMenuItem>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         }

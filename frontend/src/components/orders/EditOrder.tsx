@@ -22,6 +22,7 @@ import type { KatanaVariant } from "@/models/katana/productVariant";
 import type { KatanaBatch } from "@/models/katana/inventory";
 import { formatQuantity } from "@/lib/formatQuantity";
 
+
 export interface EditOrderHandle {
     /** Persists an unsaved draft. No-op once the order exists. */
     submit: () => Promise<void>;
@@ -436,8 +437,8 @@ export const EditOrder = ({
                                     variant="outline"
                                     className="w-full justify-start text-left font-normal bg-background border border-input text-foreground hover:bg-muted"
                                 >
-                                <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
-                                {deliveryDate ? format(deliveryDate, "yyyy/MM/dd") : <span>選擇日期</span>}
+                                    <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                                    {deliveryDate ? format(deliveryDate, "yyyy/MM/dd") : <span>選擇日期</span>}
                                 </Button>
                             }
                         />
@@ -540,62 +541,62 @@ export const EditOrder = ({
                                                 {row.batchAllocations.map((allocation, allocationIndex) => {
                                                     const selectedBatch = batch.get(allocation.batchId);
                                                     const availableQuantity = selectedBatch
-                                                       ? getBatchQuantity(selectedBatch)
-                                                       : 0;
+                                                        ? getBatchQuantity(selectedBatch)
+                                                        : 0;
                                                     return (
-                                                       <div className="flex min-w-0 flex-col gap-2" key={`${index}-${allocationIndex}`}>
-                                                           <select
-                                                               className={`${CONTROL_INPUT} w-full`}
-                                                               value={allocation.batchId || ""}
-                                                               onChange={(event) =>
-                                                                   handleRowBatchChange(
-                                                                       index,
-                                                                       allocationIndex,
-                                                                       event.target.value ? Number(event.target.value) : null
-                                                                   )
-                                                               }
-                                                           >
-                                                               <option value="">未分配批次</option>
-                                                               {availableBatchesForRow.map((availableBatch) => (
-                                                                   <option key={availableBatch.id} value={availableBatch.id}>
-                                                                       {availableBatch.batch_number}（可用 {formatQuantity(getBatchQuantity(availableBatch))}）
-                                                                   </option>
-                                                               ))}
-                                                           </select>
-                                                           {selectedBatch && (
-                                                               <div className="break-words rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs text-foreground" title={selectedBatch.batch_number}>
-                                                                   <span className="font-medium">批號：{selectedBatch.batch_number}</span>
-                                                                   <span className="ml-2 text-muted-foreground">
-                                                                       剩餘 {formatQuantity(availableQuantity)}
-                                                                   </span>
-                                                               </div>
-                                                           )}
-                                                           <div className="flex items-center gap-2">
-                                                               <label className="text-xs text-muted-foreground">分配</label>
-                                                               <input
-                                                                   aria-label="批次分配數量"
-                                                                   className="w-24 rounded border border-input bg-background px-2 py-1 text-right text-foreground"
-                                                                   min="0"
-                                                                   step="any"
-                                                                   type="number"
-                                                                   value={allocation.quantity}
-                                                                   onChange={(event) =>
-                                                                       handleBatchAllocationQuantityChange(
-                                                                           index,
-                                                                           allocationIndex,
-                                                                           Number(event.target.value) || 0
-                                                                       )
-                                                                   }
-                                                               />
-                                                               <button
-                                                                   type="button"
-                                                                   className="text-xs text-destructive"
-                                                                   onClick={() => handleRowBatchChange(index, allocationIndex, null)}
-                                                               >
-                                                                   移除
-                                                               </button>
-                                                           </div>
-                                                       </div>
+                                                        <div className="flex min-w-0 flex-col gap-2" key={`${index}-${allocationIndex}`}>
+                                                            <select
+                                                                className={`${CONTROL_INPUT} w-full`}
+                                                                value={allocation.batchId || ""}
+                                                                onChange={(event) =>
+                                                                    handleRowBatchChange(
+                                                                        index,
+                                                                        allocationIndex,
+                                                                        event.target.value ? Number(event.target.value) : null
+                                                                    )
+                                                                }
+                                                            >
+                                                                <option value="">未分配批次</option>
+                                                                {availableBatchesForRow.map((availableBatch) => (
+                                                                    <option key={availableBatch.id} value={availableBatch.id}>
+                                                                        {availableBatch.batch_number}（可用 {formatQuantity(getBatchQuantity(availableBatch))}）
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                            {selectedBatch && (
+                                                                <div className="break-words rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-xs text-foreground" title={selectedBatch.batch_number}>
+                                                                    <span className="font-medium">批號：{selectedBatch.batch_number}</span>
+                                                                    <span className="ml-2 text-muted-foreground">
+                                                                        剩餘 {formatQuantity(availableQuantity)}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-center gap-2">
+                                                                <label className="text-xs text-muted-foreground">分配</label>
+                                                                <input
+                                                                    aria-label="批次分配數量"
+                                                                    className="w-24 rounded border border-input bg-background px-2 py-1 text-right text-foreground"
+                                                                    min="0"
+                                                                    step="any"
+                                                                    type="number"
+                                                                    value={allocation.quantity}
+                                                                    onChange={(event) =>
+                                                                        handleBatchAllocationQuantityChange(
+                                                                            index,
+                                                                            allocationIndex,
+                                                                            Number(event.target.value) || 0
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    className="text-xs text-destructive"
+                                                                    onClick={() => handleRowBatchChange(index, allocationIndex, null)}
+                                                                >
+                                                                    移除
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     );
                                                 })}
                                                 <button

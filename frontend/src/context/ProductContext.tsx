@@ -19,9 +19,11 @@ interface ProductContextType {
     refetchProducts: () => Promise<void>;
     editProduct: (updatedProduct: KatanaProductDraft) => Promise<void>
     editVariant: (updatedProduct: SavedDraftVariant) => Promise<KatanaVariant>
+    createVariant: (draft: KatanaProductDraftVariant, productId: number) => Promise<KatanaVariant>;
     /** POST /products. Resolves to the product Katana created. */
     createProduct: (draft: KatanaProductDraft) => Promise<KatanaProduct>
     deleteProduct: (id: KatanaProduct["id"]) => Promise<void>
+    deleteVariant: (id: KatanaVariant["id"]) => Promise<void>
 }
 
 export const ProductContext = createContext<ProductContextType | undefined>(undefined);
