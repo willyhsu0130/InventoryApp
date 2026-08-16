@@ -10,15 +10,15 @@ import { Settings } from "./pages/Settings"
 import { Products } from "./pages/Products"
 
 import { ErrorProvider } from "./context/error/ErrorProvider"
-import { ProductProvider } from "./context/ProductProvider"
-import { InventoryProvider } from "./context/InventoryProvider"
+import { ProductProvider } from "./context/product/ProductProvider"
+import { InventoryProvider } from "./context/inventory/InventoryProvider"
 import { OrdersProvider } from "./context/orders/OrdersProvider"
 import { CustomersProvider } from "./context/customers/CustomersProvider"
 import { Customers } from "./pages/Customers"
 import { ManufactureProvider } from "./context/manufacture/ManufactureProvider"
 import { TooltipProvider } from "./components/ui/tooltip"
 import Login from "./pages/Login"
-import { AuthProvider } from "./context/AuthProvider"
+import { AuthProvider } from "./context/auth/AuthProvider"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 
 // Helper component to keep App.tsx clean
@@ -28,18 +28,18 @@ const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       <AuthProvider>
         <CustomersProvider>
           <ManufactureProvider>
-            <ProductProvider>
-              <InventoryProvider>
+            <InventoryProvider>
+              <ProductProvider>
                 <OrdersProvider>
                   {children}
                 </OrdersProvider>
-              </InventoryProvider>
-            </ProductProvider>
+              </ProductProvider>
+            </InventoryProvider>
           </ManufactureProvider>
         </CustomersProvider>
       </AuthProvider>
     </ErrorProvider>
-  </TooltipProvider>
+  </TooltipProvider >
 );
 
 export default function App() {

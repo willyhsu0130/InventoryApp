@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { AuthContext } from "./AuthContext";
-import type { AuthContextType } from "../models/authContexType";
+import { AuthContext } from "@/context/auth/AuthContext";
+import type { AuthContextType } from "@/models/authContexType";
 
 const STORAGE_KEY = 'auth_token';
 const USERNAME_STORAGE_KEY = 'auth_username';

@@ -1,7 +1,7 @@
 // src/components/inventory/InventoryTable.tsx
 import { useContext } from "react";
 import type { KatanaInventoryItem } from "../../models/katana/inventory";
-import { ProductContext } from "../../context/ProductContext";
+import { ProductContext } from "../../context/product/ProductContext";
 import { DataTable, type Column } from "../DataTable";
 
 interface InventoryTableProps {

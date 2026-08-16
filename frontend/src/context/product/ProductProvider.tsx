@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
-import { katanaFetch } from "../lib/katanaFetch";
+import { katanaFetch } from "../../lib/katanaFetch";
 import { ProductContext, type SavedDraftVariant } from "./ProductContext";
-import type { KatanaProductDraftVariant, ResolvedVariantInfo } from "../models/katana/productVariant";
+import type { KatanaProductDraftVariant, ResolvedVariantInfo } from "../../models/katana/productVariant";
 
 import {
     convertProductToCreatePayload,
@@ -11,9 +11,9 @@ import {
     type KatanaProduct,
     type KatanaProductDraft,
     type KatanaVariant,
-} from "../models/katana/productVariant";
-import { KATANA_API_ROUTES } from "../lib/routes/routes";
-import { useError } from "../hooks/useError";
+} from "../../models/katana/productVariant";
+import { KATANA_API_ROUTES } from "../../lib/routes/routes";
+import { useError } from "../../hooks/useError";
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [variants, setVariants] = useState<Map<number, KatanaVariant>>(new Map());

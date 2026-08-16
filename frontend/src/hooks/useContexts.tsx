@@ -2,13 +2,13 @@ import { useContext } from "react";
 import {
     ProductContext
 
-} from "../context/ProductContext";
+} from "../context/product/ProductContext";
 
-import { InventoryContext } from "../context/InventoryContext";
+import { InventoryContext } from "../context/inventory/InventoryContext";
 import { OrdersContext } from "@/context/orders/OrdersContext"
 import { CustomersContext } from "@/context/customers/CustomersContext";
 import { ManufactureContext } from "@/context/manufacture/ManufactureContext";
-import { AuthContext } from "@/context/AuthContext";
+import { AuthContext } from "@/context/auth/AuthContext";
 
 export const useProductCatalog = () => {
     const context = useContext(ProductContext);

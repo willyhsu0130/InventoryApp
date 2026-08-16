@@ -1,6 +1,6 @@
 import { useState, useMemo, useContext, useRef } from "react";
 import { Plus } from "lucide-react";
-import { ProductContext } from "../context/ProductContext";
+import { ProductContext } from "../context/product/ProductContext";
 import { InventoryTable } from "../components/inventory/InventoryTable";
 import { PageLayout } from "../components/PageLayout";
 import { useError } from "../hooks/useError";

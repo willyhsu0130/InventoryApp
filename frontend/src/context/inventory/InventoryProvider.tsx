@@ -7,11 +7,11 @@ import {
     type KatanaBatchStock,
     type KatanaCreateBatchInput,
     type KatanaInventoryItem
-} from "../models/katana/inventory";
+} from "../../models/katana/inventory";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { katanaFetch } from "../lib/katanaFetch";
-import { KATANA_API_ROUTES } from "../lib/routes/routes";
-import { useError } from "../hooks/useError";
+import { katanaFetch } from "../../lib/katanaFetch";
+import { KATANA_API_ROUTES } from "../../lib/routes/routes";
+import { useError } from "../../hooks/useError";
 
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [inventory, setInventory] = useState<Map<number, KatanaInventoryItem>>(new Map());

@@ -2,7 +2,7 @@ import { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageLayout } from "@/components/PageLayout";
 import { Button } from "@/components/ui/button";
-import {AuthContext} from "@/context/AuthContext";
+import {AuthContext} from "@/context/auth/AuthContext";
 
 export const Settings = () => {
   const authContext = useContext(AuthContext);
