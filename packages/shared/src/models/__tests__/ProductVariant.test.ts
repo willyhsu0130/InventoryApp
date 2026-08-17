@@ -9,7 +9,7 @@ import {
     type KatanaProductDraft,
     type KatanaProductDraftVariant,
     type KatanaProductConfig,
-} from "../productVariant";
+} from "../product";
 
 describe("Product & Variant Transformers", () => {
     describe("buildConfigCombinations", () => {

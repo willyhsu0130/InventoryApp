@@ -1,12 +1,16 @@
-// src/pages/Products.tsx
 import { useState, useMemo, useRef } from "react";
-import { useProductCatalog } from "../hooks/useContexts";
-import { ProductsTable, } from "../components/products/ProductsTable";
+import { useProductCatalog, useVariant } from "../hooks/useContexts";
+import { ProductsTable } from "../components/products/ProductsTable";
 import { Plus } from "lucide-react";
 import { useError } from "../hooks/useError";
 import { EditModal } from "../components/EditModal";
 import { EditProduct, type EditProductHandle } from "../components/products/EditProduct";
-import { UNSAVED_PRODUCT_ID } from "@/models/katana/productVariant";
+import {
+    UNSAVED_PRODUCT_ID,
+    type KatanaProduct,
+    type VariantConfigAttribute,
+    type ProductVariant,
+} from "@my-inventory-app/shared";
 import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/RefreshButton";
 import { CONTROL_INPUT } from "@/lib/styles";
@@ -24,65 +28,97 @@ export interface DisplayProductRow {
 }
 
 export const Products = () => {
-    const { products, loading, refetchProducts, deleteProduct } = useProductCatalog()
-    const { errorMessage } = useError()
+    const { products, loading: productsLoading, refetchProducts, deleteProduct } = useProductCatalog();
+    const { variants, loading: variantsLoading, refetchVariants } = useVariant();
+    const { errorMessage } = useError();
+
     const [searchTerm, setSearchTerm] = useState<string>("");
     // selectedProductId: null = closed, UNSAVED_PRODUCT_ID = create mode, >0 = edit mode
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const editProductRef = useRef<EditProductHandle>(null);
 
-    // Edits autosave on blur; only an unsaved draft needs an explicit save action.
     const isCreating = selectedProductId === UNSAVED_PRODUCT_ID;
+    const isLoading = productsLoading || variantsLoading;
 
     const handleCreateProduct = () => {
         setSelectedProductId(UNSAVED_PRODUCT_ID);
     };
 
-    const handleDeleteProduct = () => {
-        if (!selectedProductId) return
-        deleteProduct(selectedProductId)
-        setSelectedProductId(null)
-    }
+    const handleDeleteProduct = async () => {
+        if (!selectedProductId) return;
+        await deleteProduct(selectedProductId);
+        setSelectedProductId(null);
+    };
 
     const handleCloseModal = () => {
-        // Prevent closing modal while background saving is active
         if (isSaving) return;
         setSelectedProductId(null);
     };
 
+    const handleRefresh = async () => {
+        await Promise.all([refetchProducts(), refetchVariants()]);
+    };
 
+    // Group variants by product_id for fast O(1) lookup
     const productList = useMemo<DisplayProductRow[]>(() => {
-        return Array.from(products.values()).flatMap((product) => {
-            const variantsList = product.variants || [];
+        const variantsByProductId = new Map<number, ProductVariant[]>();
 
-            return variantsList.map((variant) => {
-                // Extract config values (e.g., ["三去"] or ["蝶切", "真空"])
-                const configValues = (variant.config_attributes || [])
-                    .map((attr) => attr.config_value)
-                    .filter(Boolean);
+        variants.forEach((variant: ProductVariant) => {
+            const list = variantsByProductId.get(variant.product_id);
+            if (list) {
+                list.push(variant);
+            } else {
+                variantsByProductId.set(variant.product_id, [variant]);
+            }
+        });
 
-                // Append config value to product name if variant has configs,
-                // otherwise keep base product name (e.g., "金目鱸魚下巴")
-                const displayName = configValues.length > 0
-                    ? `${product.name} - ${configValues.join(" / ")}`
-                    : product.name;
+        return Array.from(products.values()).flatMap((product: KatanaProduct): DisplayProductRow[] => {
+            const productVariants: ProductVariant[] = variantsByProductId.get(product.id) ?? [];
+
+            // Fallback row if product has no variants configured
+            if (productVariants.length === 0) {
+                return [
+                    {
+                        id: product.id,
+                        variantId: -1,
+                        name: product.name,
+                        sku: "",
+                        salesPrice: 0,
+                        purchasePrice: 0,
+                        uom: product.uom ?? "pcs",
+                        configValues: [],
+                        categoryName: product.category_name ?? undefined,
+                    },
+                ];
+            }
+
+            return productVariants.map((variant: ProductVariant): DisplayProductRow => {
+                const configValues: string[] = (variant.config_attributes ?? [])
+                    .map((attr: VariantConfigAttribute) => attr.config_value)
+                    .filter((val: string): boolean => Boolean(val?.trim()));
+
+                const displayName =
+                    configValues.length > 0
+                        ? `${product.name} - ${configValues.join(" / ")}`
+                        : product.name;
 
                 return {
-                    id: product.id,                  // Product Parent ID (e.g., 17667981)
-                    variantId: variant.id,          // Unique Variant ID (e.g., 41466914)
-                    name: displayName,              // "金目鱸魚 - 三去" or "金目鱸魚下巴"
+                    id: product.id,
+                    variantId: variant.id,
+                    name: displayName,
                     sku: variant.sku ?? "",
                     salesPrice: variant.sales_price ?? 0,
                     purchasePrice: variant.purchase_price ?? 0,
-                    uom: product.uom,               // "box" or "pcs"
-                    configValues,                    // Raw array of option values if needed for badges/filters
+                    uom: product.uom ?? "pcs",
+                    configValues,
+                    categoryName: product.category_name ?? undefined,
                 };
             });
         });
-    }, [products]);
+    }, [products, variants]);
 
-    // Search filter across Product Name, SKU, Category, or Variant Spec
+    // Filter across Name, SKU, ID, or Category
     const filteredProducts = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
         if (!term) return productList;
@@ -91,8 +127,7 @@ export const Products = () => {
             return (
                 item.name.toLowerCase().includes(term) ||
                 item.sku.toLowerCase().includes(term) ||
-                // item.category_name.toLowerCase().includes(term) ||
-                // item.variant_details?.toLowerCase().includes(term) ||
+                item.categoryName?.toLowerCase().includes(term) ||
                 item.variantId.toString().includes(term) ||
                 item.id.toString().includes(term)
             );
@@ -109,7 +144,7 @@ export const Products = () => {
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     {/* Refresh Button */}
-                    <RefreshButton label="重新整理目錄" onClick={() => refetchProducts()} />
+                    <RefreshButton label="重新整理目錄" onClick={handleRefresh} />
 
                     {/* Search Input Container */}
                     <div className="w-full sm:w-80">
@@ -127,19 +162,19 @@ export const Products = () => {
                         type="button"
                         variant="secondary"
                         size="icon"
-                        onClick={() => handleCreateProduct()}
+                        onClick={handleCreateProduct}
                     >
                         <Plus width="14" height="14" />
                     </Button>
                 </div>
             </div>
 
-            {/* Loading / Error States */}
+            {/* Loading / Error / Table States */}
             <div className="flex-1 w-full min-h-0" id="bottomContainer">
-                {loading ? (
+                {isLoading ? (
                     <div className="flex justify-center items-center h-48 text-slate-400">
                         <p className="animate-pulse font-medium text-sm">
-                            準備畫面中
+                            準備畫面中...
                         </p>
                     </div>
                 ) : errorMessage ? (
@@ -148,10 +183,13 @@ export const Products = () => {
                         <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
                     </div>
                 ) : (
-                    /* Products Table */
-                    <ProductsTable items={filteredProducts} onRowClick={(id) => setSelectedProductId(id)} />
+                    <ProductsTable
+                        items={filteredProducts}
+                        onRowClick={(id) => setSelectedProductId(id)}
+                    />
                 )}
             </div>
+
             <EditModal
                 isOpen={selectedProductId !== null}
                 title={isCreating ? "新增產品" : "編輯產品"}
@@ -163,7 +201,6 @@ export const Products = () => {
             >
                 {selectedProductId !== null && (
                     <EditProduct
-                        // Remount per product so the form never shows a stale draft.
                         key={selectedProductId}
                         ref={editProductRef}
                         id={selectedProductId}

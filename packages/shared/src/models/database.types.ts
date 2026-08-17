@@ -1426,3 +1426,17 @@ export const Constants = {
     },
   },
 } as const
+
+export class SupabaseError extends Error {
+  public details: string;
+  public hint: string;
+  public code: string;
+
+  constructor(error: { message: string; details: string; hint: string; code: string }) {
+    super(error.message);
+    this.name = 'SupabaseError';
+    this.details = error.details;
+    this.hint = error.hint;
+    this.code = error.code;
+  }
+}

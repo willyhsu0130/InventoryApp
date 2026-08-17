@@ -1,12 +1,29 @@
 import { createContext } from "react";
-import type { CreateStockAdjustmentPayload, KatanaBatch, KatanaCreateBatchInput, KatanaInventoryItem, KatanaStockAdjustment } from "@/models/katana/inventory"
+import type {
+    KatanaInventoryItem,
+    KatanaBatch,
+    KatanaStockAdjustment,
+    KatanaCreateBatchInput,
+    KatanaUpdateBatchInput,
+    KatanaStockAdjustmentInput,
+} from "@my-inventory-app/shared";
+
 export interface InventoryContextType {
-    inventory: Map<number, KatanaInventoryItem>
-    loading: boolean
-    batch: Map<number, KatanaBatch>
+    inventoryItems: Map<number, KatanaInventoryItem>; // Key: variant_id
+    batches: Map<number, KatanaBatch>;               // Key: batch_id
+    stockAdjustments: Map<number, KatanaStockAdjustment>; // Key: adjustment_id
+    loading: boolean;
     refetchInventory: () => Promise<void>;
-    createBatch: (batch: KatanaCreateBatchInput) => Promise<KatanaBatch>
-    createStockAdjustment: (stockAdjustment: CreateStockAdjustmentPayload) => Promise<KatanaStockAdjustment>
+
+    // Batch Operations
+    createBatch: (input: KatanaCreateBatchInput) => Promise<KatanaBatch>;
+    updateBatch: (id: number, input: KatanaUpdateBatchInput) => Promise<KatanaBatch>;
+    deleteBatch: (id: number) => Promise<void>;
+
+    // Stock Adjustment Operations
+    createStockAdjustment: (input: KatanaStockAdjustmentInput) => Promise<KatanaStockAdjustment>;
+    updateStockAdjustment: (id: number, input: Partial<KatanaStockAdjustment>) => Promise<KatanaStockAdjustment>;
+    deleteStockAdjustment: (id: number) => Promise<void>;
 }
 
-export const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
+export const InventoryContext = createContext<InventoryContextType | null>(null);

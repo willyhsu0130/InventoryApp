@@ -2,7 +2,7 @@ export * from "./common";
 export * from "./customers";
 export * from "./inventory";
 export * from "./manufacture";
-export * from "./productVariant";
+export * from "./product";
 export * from "./salesOrder";
 
 // Purchase order models remain defined in this compatibility barrel.

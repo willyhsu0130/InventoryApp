@@ -80,7 +80,9 @@ export const ProductsTable = ({ items, onRowClick }: ProductsTableProps) => {
             <DataTable
                 data={items}
                 columns={columns}
-                keyExtractor={(item) => item.variantId}
+                keyExtractor={(item) =>
+                    item.variantId > 0 ? item.variantId : `prod-${item.id}-fallback`
+                }
                 onRowClick={(item) => onRowClick(item.id)}
                 emptyMessage="查無符合條件的產品。"
             />

@@ -9,6 +9,7 @@ import { OrdersContext } from "@/context/orders/OrdersContext"
 import { CustomersContext } from "@/context/customers/CustomersContext";
 import { ManufactureContext } from "@/context/manufacture/ManufactureContext";
 import { AuthContext } from "@/context/auth/AuthContext";
+import { VariantContext } from "@/context/variant/VariantContext";
 
 export const useProductCatalog = () => {
     const context = useContext(ProductContext);
@@ -64,3 +65,13 @@ export const useAuth = () => {
     return context;
 };
 
+
+export const useVariant = () => {
+    const context = useContext(VariantContext);
+    if (!context) {
+        throw new Error(
+            "useVariantCatalog must be used within a VariantProvider"
+        );
+    }
+    return context;
+};

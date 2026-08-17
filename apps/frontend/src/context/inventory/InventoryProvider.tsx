@@ -1,149 +1,197 @@
-import { InventoryContext } from "./InventoryContext";
 import {
-    convertStockAdjustmentToCreatePayload,
-    type KatanaStockAdjustment,
-    type CreateStockAdjustmentPayload,
-    type KatanaBatch,
-    type KatanaBatchStock,
-    type KatanaCreateBatchInput,
-    type KatanaInventoryItem
-} from "../../models/katana/inventory";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { katanaFetch } from "../../lib/katanaFetch";
-import { KATANA_API_ROUTES } from "../../lib/routes/routes";
+    useState,
+    useCallback,
+    useEffect,
+    type FC,
+    type ReactNode,
+} from "react";
+import { InventoryContext } from "./InventoryContext";
+import { inventoryService } from "@/services/inventoryService"
+import type {
+    KatanaInventoryItem,
+    KatanaBatch,
+    KatanaStockAdjustment,
+    KatanaCreateBatchInput,
+    KatanaUpdateBatchInput,
+    KatanaStockAdjustmentInput,
+} from "@my-inventory-app/shared";
 import { useError } from "../../hooks/useError";
 
-export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [inventory, setInventory] = useState<Map<number, KatanaInventoryItem>>(new Map());
-    const [batch, setBatch] = useState<Map<number, KatanaBatch>>(new Map());
+function getErrorMessage(err: unknown, fallback: string): string {
+    if (err instanceof Error) return err.message;
+    if (typeof err === "object" && err !== null && "message" in err) {
+        return String((err as { message: unknown }).message);
+    }
+    return fallback;
+}
+
+export const InventoryProvider: FC<{ children: ReactNode }> = ({ children }) => {
+    const [inventoryItems, setInventoryItems] = useState<Map<number, KatanaInventoryItem>>(new Map());
+    const [batches, setBatches] = useState<Map<number, KatanaBatch>>(new Map());
+    const [stockAdjustments, setStockAdjustments] = useState<Map<number, KatanaStockAdjustment>>(new Map());
     const [loading, setLoading] = useState<boolean>(true);
     const { setErrorMessage } = useError();
 
-    // Shared refetch handler for background updates & manual triggers
+    // 1. Unified Sync Handler
     const refetchInventory = useCallback(async () => {
-        const inventoryRes = await katanaFetch<KatanaInventoryItem[]>(KATANA_API_ROUTES.INVENTORY);
+        try {
+            const [invData, batchData, adjData] = await Promise.all([
+                inventoryService.getInventoryLevels(),
+                inventoryService.getBatches(),
+                inventoryService.getStockAdjustments(),
+            ]);
 
-        if (inventoryRes.success && Array.isArray(inventoryRes.data)) {
-            const iMap = new Map<number, KatanaInventoryItem>();
-            inventoryRes.data.forEach((i) => iMap.set(i.variant_id, i));
-            setInventory(iMap);
-        } else {
-            console.log("Failed to sync inv data");
-            setErrorMessage("Failed to sync inventory data.");
+            const invMap = new Map<number, KatanaInventoryItem>();
+            invData.forEach((item) => invMap.set(item.variant_id, item));
+            setInventoryItems(invMap);
+
+            const bMap = new Map<number, KatanaBatch>();
+            batchData.forEach((b) => bMap.set(b.id, b));
+            setBatches(bMap);
+
+            const adjMap = new Map<number, KatanaStockAdjustment>();
+            adjData.forEach((adj) => adjMap.set(adj.id, adj));
+            setStockAdjustments(adjMap);
+        } catch (err: unknown) {
+            setErrorMessage(getErrorMessage(err, "Failed to sync inventory data."));
         }
     }, [setErrorMessage]);
 
-    const createBatch = useCallback(async (batchInput: KatanaCreateBatchInput) => {
-        const res = await katanaFetch<KatanaBatch>(KATANA_API_ROUTES.BATCHES, {
-            method: "POST",
-            body: JSON.stringify(batchInput),
-        });
-
-        if (!res.success) {
-            const errorMsg = res.message || "Failed to create batch";
-            setErrorMessage(errorMsg);
-            throw new Error(errorMsg);
-        }
-
-        if (res.data) {
-            setBatch((prev) => new Map(prev).set(res.data.id, res.data));
-        }
-
-        return res.data;
-    }, [setErrorMessage]);
-
-    const createStockAdjustment = useCallback(async (stockAdjustment: CreateStockAdjustmentPayload) => {
-        const payload = convertStockAdjustmentToCreatePayload(stockAdjustment);
-
-        const res = await katanaFetch<KatanaStockAdjustment>(
-            KATANA_API_ROUTES.STOCK_ADJUSTMENTS,
-            { method: "POST", body: JSON.stringify(payload) }
-        );
-
-        if (!res.success || !res.data) {
-            const errorMsg = "Failed to create stock adjustment";
-            setErrorMessage(errorMsg);
-            throw new Error(errorMsg);
-        }
-
-        const adjustment = res.data;
-
-        // ⚡ Optimistically update local inventory state immediately
-        setInventory((prevMap) => {
-            const nextMap = new Map(prevMap);
-
-            for (const row of adjustment.stock_adjustment_rows) {
-                const existingItem = nextMap.get(row.variant_id);
-
-                if (existingItem) {
-                    const currentQty = parseFloat(existingItem.quantity_in_stock) || 0;
-                    const newQty = currentQty + row.quantity;
-
-                    nextMap.set(row.variant_id, {
-                        ...existingItem,
-                        quantity_in_stock: newQty.toString(),
-                    });
-                }
-            }
-
-            return nextMap;
-        });
-
-        return adjustment;
-    }, [setErrorMessage]);
-
-    // Initial mount load
+    // Initial fetch on mount
     useEffect(() => {
         let isMounted = true;
 
         const loadInitialData = async () => {
-            const [inventoryRes, batchRes] = await Promise.all([
-                katanaFetch<KatanaInventoryItem[]>(KATANA_API_ROUTES.INVENTORY),
-                katanaFetch<KatanaBatchStock[]>(KATANA_API_ROUTES.BATCH_STOCKS)
-            ]);
-
-            if (!isMounted) return;
-
-            if (inventoryRes.success && Array.isArray(inventoryRes.data)) {
-                const iMap = new Map<number, KatanaInventoryItem>();
-                inventoryRes.data.forEach((i) => iMap.set(i.variant_id, i));
-                setInventory(iMap);
-            } else {
-                setErrorMessage("Failed to load inventory data.");
-            }
-
-            if (batchRes.success && Array.isArray(batchRes.data)) {
-                const bMap = new Map<number, KatanaBatch>();
-                batchRes.data.forEach((stock) => {
-                    bMap.set(stock.batch_id, {
-                        ...stock,
-                        id: stock.batch_id,
-                    });
-                });
-                setBatch(bMap);
-            }
-
-            setLoading(false);
+            await refetchInventory();
+            if (isMounted) setLoading(false);
         };
 
-        loadInitialData();
+        void loadInitialData();
 
         return () => {
             isMounted = false;
         };
-    }, [setErrorMessage]);
+    }, [refetchInventory]);
 
-    const contextValue = useMemo(() => ({
-        inventory,
-        batch,
-        loading,
-        refetchInventory,
-        createBatch,
-        createStockAdjustment
-    }), [inventory, batch, loading, refetchInventory, createBatch, createStockAdjustment]);
+    // 2. Batch Methods
+    const createBatch = useCallback(
+        async (input: KatanaCreateBatchInput): Promise<KatanaBatch> => {
+            try {
+                const created = await inventoryService.createBatch(input);
+                setBatches((prev) => new Map(prev).set(created.id, created));
+                return created;
+            } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Failed to create batch");
+                setErrorMessage(msg);
+                throw new Error(msg, { cause: err });
+            }
+        },
+        [setErrorMessage]
+    );
+
+    const updateBatch = useCallback(
+        async (id: number, input: KatanaUpdateBatchInput): Promise<KatanaBatch> => {
+            try {
+                const updated = await inventoryService.updateBatch(id, input);
+                setBatches((prev) => new Map(prev).set(updated.id, updated));
+                return updated;
+            } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Failed to update batch");
+                setErrorMessage(msg);
+                throw new Error(msg, { cause: err });
+            }
+        },
+        [setErrorMessage]
+    );
+
+    const deleteBatch = useCallback(
+        async (id: number): Promise<void> => {
+            try {
+                await inventoryService.deleteBatch(id);
+                setBatches((prev) => {
+                    const next = new Map(prev);
+                    next.delete(id);
+                    return next;
+                });
+            } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Failed to delete batch");
+                setErrorMessage(msg);
+                throw new Error(msg, { cause: err });
+            }
+        },
+        [setErrorMessage]
+    );
+
+    // 3. Stock Adjustment Methods
+    const createStockAdjustment = useCallback(
+        async (input: KatanaStockAdjustmentInput): Promise<KatanaStockAdjustment> => {
+            try {
+                const created = await inventoryService.createStockAdjustment(input);
+                setStockAdjustments((prev) => new Map(prev).set(created.id, created));
+                // Refresh inventory levels to show updated stock
+                await refetchInventory();
+                return created;
+            } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Failed to create stock adjustment");
+                setErrorMessage(msg);
+                throw new Error(msg, { cause: err });
+            }
+        },
+        [refetchInventory, setErrorMessage]
+    );
+
+    const updateStockAdjustment = useCallback(
+        async (
+            id: number,
+            input: Partial<KatanaStockAdjustment>
+        ): Promise<KatanaStockAdjustment> => {
+            try {
+                const updated = await inventoryService.updateStockAdjustment(id, input);
+                setStockAdjustments((prev) => new Map(prev).set(updated.id, updated));
+                return updated;
+            } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Failed to update stock adjustment");
+                setErrorMessage(msg);
+                throw new Error(msg, { cause: err });
+            }
+        },
+        [setErrorMessage]
+    );
+
+    const deleteStockAdjustment = useCallback(
+        async (id: number): Promise<void> => {
+            try {
+                await inventoryService.deleteStockAdjustment(id);
+                setStockAdjustments((prev) => {
+                    const next = new Map(prev);
+                    next.delete(id);
+                    return next;
+                });
+            } catch (err: unknown) {
+                const msg = getErrorMessage(err, "Failed to delete stock adjustment");
+                setErrorMessage(msg);
+                throw new Error(msg, { cause: err });
+            }
+        },
+        [setErrorMessage]
+    );
 
     return (
-        <InventoryContext.Provider value={contextValue}>
+        <InventoryContext.Provider
+            value={{
+                inventoryItems,
+                batches,
+                stockAdjustments,
+                loading,
+                refetchInventory,
+                createBatch,
+                updateBatch,
+                deleteBatch,
+                createStockAdjustment,
+                updateStockAdjustment,
+                deleteStockAdjustment,
+            }}
+        >
             {children}
         </InventoryContext.Provider>
     );

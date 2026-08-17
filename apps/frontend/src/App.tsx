@@ -1,50 +1,51 @@
-// src/App.tsx
-import { BrowserRouter, Routes, Route } from "react-router-dom"
-import MainLayout from "./MainLayout"
-import { Dashboard } from "./pages/Dashboard"
-import { Orders } from "./pages/Orders"
-import { Inventory } from "./pages/Inventory"
-import { InventoryBatches } from "./pages/InventoryBatches"
-import { Manufacture } from "./pages/Manufacture"
-import { Settings } from "./pages/Settings"
-import { Products } from "./pages/Products"
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import type { ComponentType, ReactNode } from "react";
 
-import { ErrorProvider } from "./context/error/ErrorProvider"
-import { ProductProvider } from "./context/product/ProductProvider"
-import { InventoryProvider } from "./context/inventory/InventoryProvider"
-import { OrdersProvider } from "./context/orders/OrdersProvider"
-import { CustomersProvider } from "./context/customers/CustomersProvider"
-import { Customers } from "./pages/Customers"
-import { ManufactureProvider } from "./context/manufacture/ManufactureProvider"
-import { TooltipProvider } from "./components/ui/tooltip"
-import Login from "./pages/Login"
-import { AuthProvider } from "./context/auth/AuthProvider"
-import { ProtectedRoute } from "./components/ProtectedRoute"
+// Layout & Pages
+import MainLayout from "./MainLayout";
+import Login from "./pages/Login";
+import { Dashboard } from "./pages/Dashboard";
+import { Orders } from "./pages/Orders";
+import { Inventory } from "./pages/Inventory";
+import { InventoryBatches } from "./pages/InventoryBatches";
+import { Manufacture } from "./pages/Manufacture";
+import { Settings } from "./pages/Settings";
+import { Products } from "./pages/Products";
+import { Customers } from "./pages/Customers";
 
-// Helper component to keep App.tsx clean
-const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <TooltipProvider>
-    <ErrorProvider>
-      <AuthProvider>
-        <CustomersProvider>
-          <ManufactureProvider>
-            <InventoryProvider>
-              <ProductProvider>
-                <OrdersProvider>
-                  {children}
-                </OrdersProvider>
-              </ProductProvider>
-            </InventoryProvider>
-          </ManufactureProvider>
-        </CustomersProvider>
-      </AuthProvider>
-    </ErrorProvider>
-  </TooltipProvider >
-);
+// Auth & Route Guard
+import { ProtectedRoute } from "./components/ProtectedRoute";
+
+// Providers
+import { TooltipProvider } from "./components/ui/tooltip";
+import { ErrorProvider } from "./context/error/ErrorProvider";
+import { AuthProvider } from "./context/auth/AuthProvider";
+import { CustomersProvider } from "./context/customers/CustomersProvider";
+import { ManufactureProvider } from "./context/manufacture/ManufactureProvider";
+import { InventoryProvider } from "./context/inventory/InventoryProvider";
+import { ProductProvider } from "./context/product/ProductProvider";
+import { VariantProvider } from "./context/variant/VariantProvider";
+import { OrdersProvider } from "./context/orders/OrdersProvider";
+
+// Composer
+import { ProviderComposer } from "./components/ProviderComposer";
+
+// Evaluated from top (outermost) to bottom (innermost)
+const appProviders: Array<ComponentType<{ children: ReactNode }>> = [
+  TooltipProvider,
+  ErrorProvider,
+  AuthProvider,
+  CustomersProvider,
+  ManufactureProvider,
+  InventoryProvider,
+  ProductProvider,
+  VariantProvider,
+  OrdersProvider,
+];
 
 export default function App() {
   return (
-    <AppProviders>
+    <ProviderComposer providers={appProviders}>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -64,6 +65,6 @@ export default function App() {
           </Route>
         </Routes>
       </BrowserRouter>
-    </AppProviders>
-  )
+    </ProviderComposer>
+  );
 }

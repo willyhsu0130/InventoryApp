@@ -1,19 +1,23 @@
+// packages/shared/src/models/inventory.ts
+
 import type { KatanaLocation } from "./common";
-import type { KatanaVariant } from "./productVariant";
+import type { ProductVariant } from "./variant";
 
 export interface KatanaInventoryItem {
+    id?: number;
     variant_id: number;
     location_id: number;
-    reorder_point: string;
-    average_cost: string;
-    value_in_stock: string;
-    quantity_in_stock: string;
-    quantity_committed: string;
-    quantity_expected: string;
-    quantity_missing_or_excess: string;
-    quantity_potential: string;
+    reorder_point: number;
+    average_cost: number;
+    value_in_stock: number;
+    quantity_in_stock: number;
+    quantity_committed: number;
+    quantity_expected: number;
+    quantity_missing_or_excess?: number | null;
+    quantity_potential?: number | null;
+    updated_at?: string;
 
-    variant?: KatanaVariant;
+    variant?: ProductVariant;
     location?: KatanaLocation;
 }
 
@@ -52,8 +56,8 @@ export interface KatanaBatch {
     id: number;
     batch_number: string;
     variant_id: number;
-    location_id?: number;
-    quantity_in_stock?: string;
+    location_id?: number | null;
+    quantity_in_stock: number;
     expiration_date?: string | null;
     batch_created_date?: string | null;
     batch_barcode?: string | null;
@@ -130,19 +134,20 @@ export const convertStockAdjustmentToCreatePayload = (
 
     const cleanAdjustmentNumber =
         stock_adjustment_number && stock_adjustment_number.trim().length > 0
-            ? stock_adjustment_number
+            ? stock_adjustment_number.trim()
             : undefined;
 
     const cleanAdjustmentDate =
         stock_adjustment_date && stock_adjustment_date.trim().length > 0
-            ? stock_adjustment_date
+            ? stock_adjustment_date.trim()
             : undefined;
 
-    const cleanReason = reason && reason.trim().length > 0 ? reason : undefined;
+    const cleanReason =
+        reason && reason.trim().length > 0 ? reason.trim() : undefined;
 
     const cleanAdditionalInfo =
         additional_info && additional_info.trim().length > 0
-            ? additional_info
+            ? additional_info.trim()
             : undefined;
 
     const cleanRows: CreateStockAdjustmentRowPayload[] =
@@ -207,19 +212,20 @@ export const convertStockAdjustmentToUpdatePayload = (
 
     const cleanAdjustmentNumber =
         stock_adjustment_number && stock_adjustment_number.trim().length > 0
-            ? stock_adjustment_number
+            ? stock_adjustment_number.trim()
             : undefined;
 
     const cleanAdjustmentDate =
         stock_adjustment_date && stock_adjustment_date.trim().length > 0
-            ? stock_adjustment_date
+            ? stock_adjustment_date.trim()
             : undefined;
 
-    const cleanReason = reason && reason.trim().length > 0 ? reason : undefined;
+    const cleanReason =
+        reason && reason.trim().length > 0 ? reason.trim() : undefined;
 
     const cleanAdditionalInfo =
         additional_info && additional_info.trim().length > 0
-            ? additional_info
+            ? additional_info.trim()
             : undefined;
 
     return {

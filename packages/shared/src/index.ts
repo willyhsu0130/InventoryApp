@@ -4,104 +4,109 @@
 // 1. INVENTORY DOMAIN
 // ==========================================
 export type {
-    KatanaInventoryItem,
-    KatanaTraceabilityEntry,
-    KatanaBatchTransaction,
-    KatanaBatch,
-    KatanaBatchStock,
-    KatanaCreateBatchInput,
-    KatanaUpdateBatchInput,
-    KatanaStockAdjustmentRowInput,
-    KatanaStockAdjustmentInput,
-    CreateStockAdjustmentRowPayload,
-    CreateStockAdjustmentPayload,
-    KatanaUpdateStockAdjustmentPayload,
-    KatanaStockAdjustmentRow,
-    KatanaStockAdjustment,
+  KatanaInventoryItem,
+  KatanaTraceabilityEntry,
+  KatanaBatchTransaction,
+  KatanaBatch,
+  KatanaBatchStock,
+  KatanaCreateBatchInput,
+  KatanaUpdateBatchInput,
+  KatanaStockAdjustmentRowInput,
+  KatanaStockAdjustmentInput,
+  CreateStockAdjustmentRowPayload,
+  CreateStockAdjustmentPayload,
+  KatanaUpdateStockAdjustmentPayload,
+  KatanaStockAdjustmentRow,
+  KatanaStockAdjustment,
 } from "./models/inventory";
 
 export {
-    convertStockAdjustmentToCreatePayload,
-    convertStockAdjustmentToUpdatePayload,
+  convertStockAdjustmentToCreatePayload,
+  convertStockAdjustmentToUpdatePayload,
 } from "./models/inventory";
 
 // ==========================================
 // 2. CUSTOMER DOMAIN
 // ==========================================
 export type {
-    KatanaCustomerAddressInput,
-    KatanaCustomerAddress,
-    KatanaCustomerInput,
-    KatanaCustomer,
-    CreateCustomerAddressPayload,
-    CreateCustomerPayload,
-    UpdateCustomerPayload,
-    KatanaCustomerDraft,
+  KatanaCustomerAddressInput,
+  KatanaCustomerAddress,
+  KatanaCustomerInput,
+  KatanaCustomer,
+  CreateCustomerAddressPayload,
+  CreateCustomerPayload,
+  UpdateCustomerPayload,
+  KatanaCustomerDraft,
 } from "./models/customers";
 
 export {
-    convertCustomerToCreatePayload,
-    convertCustomerToUpdatePayload,
+  convertCustomerToCreatePayload,
+  convertCustomerToUpdatePayload,
 } from "./models/customers";
 
 // ==========================================
-// 3. PRODUCT & VARIANT DOMAIN
+// 3. PRODUCT DOMAIN
 // ==========================================
 export type {
-    KatanaProduct,
-    KatanaProductDraft,
-    KatanaProductDraftVariant,
-    KatanaProductConfig,
-    KatanaVariant,
-    ResolvedVariantInfo,
-    KatanaCreateProductPayload,
-    KatanaCreateVariantPayload,
-    KatanaUpdateProductPayload,
-    KatanaUpdateVariantPayload,
-} from "./models/productVariant";
+  KatanaProductConfig,
+  KatanaProductInput,
+  KatanaProduct,
+  KatanaProductDraft,
+  KatanaCreateProductPayload,
+  KatanaUpdateProductPayload,
+} from "./models/product";
 
 export {
-    UNSAVED_PRODUCT_ID,
-    isUnsavedProduct,
-    createEmptyProductDraft,
-    buildConfigCombinations,
-    syncDraftVariantsToConfigs,
-    convertProductToPayload,
-    convertVariantToPayload,
-    convertProductToCreatePayload,
-    convertVariantToCreatePayload,
-} from "./models/productVariant";
+  UNSAVED_PRODUCT_ID,
+  isUnsavedProduct,
+  createEmptyProductDraft,
+  convertProductToPayload,
+  convertProductToCreatePayload,
+} from "./models/product";
 
 // ==========================================
-// 4. SALES ORDER DOMAIN
+// 4. VARIANT DOMAIN
 // ==========================================
 export type {
-    KatanaSalesOrderStatus,
-    KatanaProductAvailability,
-    KatanaIngredientAvailability,
-    KatanaProductionStatus,
-    KatanaSalesOrder,
-    KatanaSalesOrderRow,
-    KatanaSalesOrderRowAttribute,
-    KatanaSalesOrderAddress,
-    KatanaSalesOrderShippingFee,
-    EnrichedSalesOrder,
-    EnrichedSalesOrderRow,
-    KatanaSalesOrderDraft,
-    CreateSalesOrderPayload,
-    CreateSalesOrderRowPayload,
-    CreateSalesOrderAddressPayload,
-    UpdateSalesOrderPayload,
-    UpdateSalesOrderRowPayload,
+  VariantConfigAttribute,
+  VariantRow,
+  VariantInsert,
+  VariantUpdate,
+  ProductVariant,
+  CreateVariantInput,
+  UpdateVariantInput,
+} from "./models/variant";
+
+// ==========================================
+// 5. SALES ORDER DOMAIN
+// ==========================================
+export type {
+  KatanaSalesOrderStatus,
+  KatanaProductAvailability,
+  KatanaIngredientAvailability,
+  KatanaProductionStatus,
+  KatanaSalesOrder,
+  KatanaSalesOrderRow,
+  KatanaSalesOrderRowAttribute,
+  KatanaSalesOrderAddress,
+  KatanaSalesOrderShippingFee,
+  EnrichedSalesOrder,
+  EnrichedSalesOrderRow,
+  KatanaSalesOrderDraft,
+  CreateSalesOrderPayload,
+  CreateSalesOrderRowPayload,
+  CreateSalesOrderAddressPayload,
+  UpdateSalesOrderPayload,
+  UpdateSalesOrderRowPayload,
 } from "./models/salesOrder";
 
 export {
-    convertSalesOrderToCreatePayload,
-    convertSalesOrderToUpdatePayload,
+  convertSalesOrderToCreatePayload,
+  convertSalesOrderToUpdatePayload,
 } from "./models/salesOrder";
 
-// Supabase
-// packages/shared/src/index.ts
+// ==========================================
+// 6. SUPABASE & DATABASE TYPES
+// ==========================================
 export * from "./models/database.types";
-// You can also export convenient table alias helpers
 export type { Database } from "./models/database.types";

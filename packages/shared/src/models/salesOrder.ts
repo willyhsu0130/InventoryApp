@@ -3,7 +3,7 @@
 // ==========================================
 
 import type { KatanaBatchTransaction, KatanaTraceabilityEntry } from "./inventory";
-import type { ResolvedVariantInfo } from "./productVariant";
+import type { ResolvedVariantInfo } from "./product";
 
 export type KatanaSalesOrderStatus =
     | "NOT_SHIPPED"
