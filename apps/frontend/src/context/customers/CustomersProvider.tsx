@@ -4,7 +4,8 @@ import {
     convertCustomerToUpdatePayload,
     type KatanaCustomer,
     type KatanaCustomerDraft,
-} from "@/models/katana/customers";
+} from "@my-inventory-app/shared";
+
 import { CustomersContext } from "@/context/customers/CustomersContext";
 import { katanaFetch } from "@/lib/katanaFetch";
 import { KATANA_API_ROUTES } from "@/lib/routes/routes";

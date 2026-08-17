@@ -1,0 +1,15 @@
+{
+  "folders": [
+    { "name": "🎨 Frontend", "path": "apps/frontend" },
+    { "name": "⚙️ Backend", "path": "apps/backend" },
+    { "name": "📦 Shared Types", "path": "packages/shared" },
+    { "name": "🗄️ Supabase DB", "path": "supabase" }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.turbo": true
+    }
+  }
+}
