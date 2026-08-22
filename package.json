@@ -25,10 +25,12 @@
     "dev:backend": "npm run dev -w backend",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "update-types": "dotenv -e .env supabase gen types typescript --project-id \"lrffpvcrxqrwomsgnxja\" --schema public > packages/shared/src/models/database.types.ts"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",
+    "dotenv-cli": "^11.0.0",
     "typescript": "^5.5.0"
   }
 }

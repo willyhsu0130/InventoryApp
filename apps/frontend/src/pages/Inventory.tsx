@@ -1,16 +1,20 @@
-import { useState, useMemo, useContext, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Plus } from "lucide-react";
-import { ProductContext } from "../context/product/ProductContext";
 import { InventoryTable } from "../components/inventory/InventoryTable";
 import { PageLayout } from "../components/PageLayout";
 import { useError } from "../hooks/useError";
+import {
+    useInventoryCatalog,
+    useProductCatalog,
+    useVariant,
+} from "../hooks/useContexts";
+import type { KatanaInventoryItem } from "@my-inventory-app/shared";
 import {
     CONTROL_INPUT,
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
 } from "../lib/styles";
-import { useInventoryCatalog } from "../hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { StockAdjustment, type StockAdjustmentHandle } from "@/components/inventory/StockAdjustment";
 import { Button } from "@/components/ui/button";
@@ -22,8 +26,9 @@ type AdjustmentTarget = { variantId: number | null } | null;
 
 export const Inventory = () => {
     // 1. Consume inventory catalog and product context
-    const { inventory, loading, refetchInventory } = useInventoryCatalog();
-    const productCtx = useContext(ProductContext);
+    const { inventoryItems, loading: inventoryLoading, refetchInventory } = useInventoryCatalog();
+    const { products, loading: productsLoading } = useProductCatalog();
+    const { variants, loading: variantsLoading } = useVariant();
 
     const { errorMessage } = useError();
     const [searchTerm, setSearchTerm] = useState<string>("");
@@ -31,24 +36,30 @@ export const Inventory = () => {
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
     const stockAdjustmentRef = useRef<StockAdjustmentHandle>(null);
-    const inventoryList = useMemo(() => {
-        return Array.from(inventory.values());
-    }, [inventory]);
+
+    // 2. Explicitly type inventoryList
+    const inventoryList = useMemo<KatanaInventoryItem[]>(() => {
+        return Array.from(inventoryItems.values());
+    }, [inventoryItems]);
 
     // 3. Filter across Variant ID, Product Name, SKU, and Variant Details
-    const filteredItems = useMemo(() => {
+    const filteredItems = useMemo<KatanaInventoryItem[]>(() => {
         const term = searchTerm.toLowerCase().trim();
         if (!term) return inventoryList;
 
-        return inventoryList.filter((item) => {
-            const details = productCtx?.getVariantDetails(item.variant_id);
-            const productNameMatch = details?.product_name.toLowerCase().includes(term);
-            const variantDetailsMatch = details?.variant_details?.toLowerCase().includes(term);
-            const skuMatch = details?.sku.toLowerCase().includes(term);
+        return inventoryList.filter((item: KatanaInventoryItem) => {
+            const variant = variants.get(item.variant_id);
+            const product = variant ? products.get(variant.product_id) : undefined;
+
+            const productNameMatch = product?.name.toLowerCase().includes(term);
+            const skuMatch = variant?.sku?.toLowerCase().includes(term);
+            const variantDetailsMatch = variant?.config_attributes?.some(
+                (attr) => attr.config_value?.toLowerCase().includes(term)
+            );
             const variantIdMatch = item.variant_id.toString().includes(term);
             const locationIdMatch = item.location_id.toString().includes(term);
 
-            return (
+            return Boolean(
                 productNameMatch ||
                 variantDetailsMatch ||
                 skuMatch ||
@@ -56,9 +67,9 @@ export const Inventory = () => {
                 locationIdMatch
             );
         });
-    }, [inventoryList, searchTerm, productCtx]);
+    }, [inventoryList, searchTerm, products, variants]);
 
-    const isGlobalLoading = loading || (productCtx?.loading ?? false);
+    const isGlobalLoading = inventoryLoading || productsLoading || variantsLoading;
 
     return (
         <PageLayout
@@ -111,14 +122,13 @@ export const Inventory = () => {
                 onClose={() => setAdjustmentTarget(null)}
                 isSaving={isSaving}
                 onSave={() => stockAdjustmentRef.current?.submit()}
-
             >
                 <StockAdjustment
                     onSavingChange={setIsSaving}
                     items={inventoryList}
                     ref={stockAdjustmentRef}
                     onSuccess={async () => {
-                        setAdjustmentTarget(null); // 2. Close the modal!
+                        setAdjustmentTarget(null);
                     }}
                     initialVariantId={adjustmentTarget?.variantId}
                 />

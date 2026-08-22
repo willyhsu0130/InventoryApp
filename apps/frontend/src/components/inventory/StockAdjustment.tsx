@@ -1,17 +1,13 @@
-// src/components/inventory/StockAdjustment.tsx
-import { useImperativeHandle, useEffect, useMemo, useState } from "react";
+import { useImperativeHandle, useMemo, useState, useCallback } from "react";
 import { X, Calendar as CalendarIcon } from "lucide-react";
-import { katanaFetch } from "../../lib/katanaFetch";
-import { KATANA_API_ROUTES } from "../../lib/routes/routes";
-import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL } from "../../lib/styles";
-import { useInventoryCatalog, useProductCatalog } from "../../hooks/useContexts";
-import {
-    type KatanaBatch,
-    type KatanaInventoryItem,
-    type KatanaStockAdjustmentRowInput,
-    type KatanaTraceabilityEntry,
-} from "../../models/katana/inventory";
-import type { KatanaLocation } from "@/models/katana/common";
+import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL } from "@/lib/styles";
+import { useInventoryCatalog, useProductCatalog, useVariant } from "@/hooks/useContexts";
+import type {
+    KatanaBatch,
+    KatanaInventoryItem,
+    KatanaStockAdjustmentRowInput,
+    KatanaTraceabilityEntry,
+} from "@my-inventory-app/shared";
 
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
@@ -19,6 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { addYears, format, subDays } from "date-fns";
 
 const NEW_BATCH_VALUE = "__new__";
+const DEFAULT_LOCATION_ID = 1;
+const DEFAULT_LOCATION_NAME = "晁欣";
 
 export interface StockAdjustmentHandle {
     submit: () => Promise<void>;
@@ -54,16 +52,11 @@ export const StockAdjustment = ({
     onSuccess,
     ref,
 }: StockAdjustmentProps) => {
-    const { products, getVariantDetails } = useProductCatalog();
-    const { batch, createBatch, createStockAdjustment } = useInventoryCatalog();
+    const { products } = useProductCatalog();
+    const { variants } = useVariant();
+    const { batches, createBatch, createStockAdjustment } = useInventoryCatalog();
 
-    const [locations, setLocations] = useState<KatanaLocation[]>([]);
-    const [locationId, setLocationId] = useState<number | null>(
-        initialVariantId != null
-            ? items.find((item) => item.variant_id === initialVariantId)?.location_id ?? null
-            : null
-    );
-
+    const [locationId] = useState<number>(DEFAULT_LOCATION_ID);
     const [rows, setRows] = useState<AdjustmentDraftRow[]>(() =>
         initialVariantId != null
             ? [{ variantId: initialVariantId, targetQuantity: undefined }]
@@ -74,81 +67,62 @@ export const StockAdjustment = ({
     const [adjustmentCalendarOpen, setAdjustmentCalendarOpen] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
+    const getVariantMetadata = useCallback(
+        (variantId: number) => {
+            const variant = variants.get(variantId);
+            const product = variant ? products.get(variant.product_id) : undefined;
+            const detailsString = variant?.config_attributes
+                ?.map((attr) => attr.config_value)
+                .filter(Boolean)
+                .join(" / ");
 
-    // Fetch locations on mount
-    useEffect(() => {
-        let isMounted = true;
-
-        const loadLocations = async () => {
-            const res = await katanaFetch<KatanaLocation[]>(KATANA_API_ROUTES.LOCATIONS);
-            if (!isMounted) return;
-
-            if (!res.success || !Array.isArray(res.data)) {
-                setFormError(res.success ? "無法讀取倉庫列表。" : res.message);
-                return;
-            }
-
-            setLocations(res.data);
-            const preferred = res.data.find((loc) => loc.is_primary) ?? res.data[0];
-            setLocationId((current) => current ?? preferred?.id ?? null);
-        };
-
-        loadLocations();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
+            return {
+                product,
+                variant,
+                product_name: product?.name ?? `Variant #${variantId}`,
+                variant_details: detailsString || undefined,
+                is_batch_tracked: product?.batch_tracked ?? false,
+            };
+        },
+        [products, variants]
+    );
 
     const stockByVariant = useMemo(() => {
         const byVariant = new Map<number, number>();
         for (const item of items) {
-            if (locationId != null && item.location_id !== locationId) continue;
-            byVariant.set(item.variant_id, parseFloat(item.quantity_in_stock) || 0);
+            // Fall back to matching all items if location_id doesn't strictly match
+            if (locationId != null && item.location_id != null && item.location_id !== locationId) continue;
+            byVariant.set(item.variant_id, Number(item.quantity_in_stock) || 0);
         }
         return byVariant;
-    }, [items, locationId]);
+    }, [items, locationId]);;
 
     const batchesByVariant = useMemo(() => {
         const byVariant = new Map<number, KatanaBatch[]>();
-        for (const b of batch.values()) {
+        for (const b of batches.values()) {
             const list = byVariant.get(b.variant_id) ?? [];
             list.push(b);
             byVariant.set(b.variant_id, list);
         }
         return byVariant;
-    }, [batch]);
-
-    const isBatchTrackedVariant = (variantId: number): boolean => {
-        const details = getVariantDetails(variantId);
-        return products.get(details.productId)?.batch_tracked ?? false;
-    };
+    }, [batches]);
 
     const selectableVariants = useMemo(() => {
         const alreadyAdded = new Set(rows.map((row) => row.variantId));
 
         return items
-            .filter(
-                (item) =>
-                    (locationId == null || item.location_id === locationId) &&
-                    !alreadyAdded.has(item.variant_id)
-            )
+            .filter((item) => !alreadyAdded.has(item.variant_id)) // <-- Don't choke if item.location_id is missing or different
             .map((item) => {
-                const details = getVariantDetails(item.variant_id);
-                const product = products.get(details.productId);
-                const isParentVariant =
-                    (product?.configs?.length ?? 0) > 0 && !details.variant_details;
-
+                const meta = getVariantMetadata(item.variant_id);
                 return {
                     variantId: item.variant_id,
-                    label: details.variant_details
-                        ? `${details.product_name} - ${details.variant_details}`
-                        : details.product_name,
-                    isParentVariant,
+                    label: meta.variant_details
+                        ? `${meta.product_name} - ${meta.variant_details}`
+                        : meta.product_name,
                 };
             })
-            .filter((variant) => !variant.isParentVariant)
             .sort((a, b) => a.label.localeCompare(b.label));
-    }, [items, locationId, rows, getVariantDetails, products]);
+    }, [items, rows, getVariantMetadata]);
 
     const handleAddRow = (variantId: number) => {
         setFormError(null);
@@ -249,11 +223,6 @@ export const StockAdjustment = ({
     };
 
     const handleSave = async () => {
-        if (locationId == null) {
-            setFormError("請選擇倉庫。");
-            return;
-        }
-
         const adjustmentRows: KatanaStockAdjustmentRowInput[] = [];
 
         for (const row of rows) {
@@ -274,8 +243,9 @@ export const StockAdjustment = ({
             if (delta === 0) continue;
 
             let traceability: KatanaTraceabilityEntry[] | undefined;
+            const meta = getVariantMetadata(row.variantId);
 
-            if (isBatchTrackedVariant(row.variantId) && row.batchId !== undefined) {
+            if (meta.is_batch_tracked && row.batchId !== undefined) {
                 let resolvedBatchId: number;
 
                 if (row.batchId === "new") {
@@ -292,8 +262,7 @@ export const StockAdjustment = ({
                             expiration_date: row.expirationDate ? row.expirationDate.toISOString() : undefined,
                         });
                         resolvedBatchId = created.id;
-                    } catch (err) {
-                        console.error("Failed to create batch:", err);
+                    } catch (err: unknown) {
                         setFormError(err instanceof Error ? err.message : "建立批次失敗。");
                         return;
                     }
@@ -332,8 +301,7 @@ export const StockAdjustment = ({
             } else {
                 setFormError("庫存調整失敗。");
             }
-        } catch (err) {
-            console.error("Failed to save stock adjustment:", err);
+        } catch (err: unknown) {
             setFormError(err instanceof Error ? err.message : "庫存調整失敗。");
         } finally {
             onSavingChange?.(false);
@@ -349,18 +317,12 @@ export const StockAdjustment = ({
             <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col gap-y-1">
                     <label className={FIELD_LABEL}>倉庫</label>
-                    <select
-                        className={CONTROL_INPUT}
-                        value={locationId ?? ""}
-                        onChange={(e) => setLocationId(Number(e.target.value))}
-                    >
-                        {locations.length === 0 && <option value="">讀取中...</option>}
-                        {locations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                                {location.name}
-                            </option>
-                        ))}
-                    </select>
+                    <input
+                        type="text"
+                        className={`${CONTROL_INPUT} bg-muted text-muted-foreground cursor-not-allowed`}
+                        value={DEFAULT_LOCATION_NAME}
+                        disabled
+                    />
                 </div>
 
                 <div className="flex flex-col gap-y-1">
@@ -372,8 +334,8 @@ export const StockAdjustment = ({
                                     variant="outline"
                                     className="w-full justify-start text-left font-normal bg-background border border-input text-foreground hover:bg-muted"
                                 >
-                                <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
-                                {adjustmentDate ? format(adjustmentDate, "yyyy/MM/dd") : <span>選擇日期</span>}
+                                    <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                                    {adjustmentDate ? format(adjustmentDate, "yyyy/MM/dd") : <span>選擇日期</span>}
                                 </Button>
                             }
                         />
@@ -382,7 +344,6 @@ export const StockAdjustment = ({
                                 mode="single"
                                 selected={adjustmentDate}
                                 onSelect={handleAdjustmentDateSelect}
-
                             />
                         </PopoverContent>
                     </Popover>
@@ -409,7 +370,6 @@ export const StockAdjustment = ({
                             <th className="py-3 px-4 border-b border-slate-800 text-right">調整後數量</th>
                             <th className="py-3 px-4 border-b border-slate-800">批次與有效日期</th>
                             <th className="py-3 px-4 border-b border-slate-800 text-right">變動</th>
-                            {/* 刪除鍵 */}
                             <th className="py-3 px-4 border-b border-slate-800 w-10" />
                         </tr>
                     </thead>
@@ -422,22 +382,21 @@ export const StockAdjustment = ({
                             </tr>
                         ) : (
                             rows.map((row) => {
-                                const details = getVariantDetails(row.variantId);
+                                const meta = getVariantMetadata(row.variantId);
                                 const current = stockByVariant.get(row.variantId) ?? 0;
                                 const effectiveQtyStr = getEffectiveQuantityString(row);
                                 const delta = deltaFor(row);
-                                const batchTracked = isBatchTrackedVariant(row.variantId);
                                 const variantBatches = batchesByVariant.get(row.variantId) ?? [];
 
                                 return (
                                     <tr key={row.variantId} className="border-b border-slate-800/40">
                                         <td className="py-2.5 px-4 font-sans">
                                             <div className="font-medium text-slate-100">
-                                                {details.product_name}
+                                                {meta.product_name}
                                             </div>
-                                            {details.variant_details && (
+                                            {meta.variant_details && (
                                                 <div className="text-xs text-muted-foreground mt-0.5">
-                                                    {details.variant_details}
+                                                    {meta.variant_details}
                                                 </div>
                                             )}
                                         </td>
@@ -457,7 +416,7 @@ export const StockAdjustment = ({
                                             />
                                         </td>
                                         <td className="py-2.5 px-4 gap-x-3">
-                                            {batchTracked ? (
+                                            {meta.is_batch_tracked ? (
                                                 <div className="flex gap-x-3 items-center w-full">
                                                     <div className="flex flex-col gap-y-1 w-full">
                                                         <select
@@ -473,7 +432,7 @@ export const StockAdjustment = ({
                                                         >
                                                             <option value="">選擇批次...</option>
                                                             {variantBatches
-                                                                .filter((b) => b.batch_number !== "Unbatched") // Exclude Katana's fallback row if present
+                                                                .filter((b) => b.batch_number !== "Unbatched")
                                                                 .map((b) => (
                                                                     <option key={b.id} value={b.id}>
                                                                         {b.batch_number}
@@ -507,10 +466,10 @@ export const StockAdjustment = ({
                                                                             size="sm"
                                                                             className="bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 text-xs px-2.5"
                                                                         >
-                                                                        <CalendarIcon className="h-3.5 w-3.5 mr-1 text-slate-400" />
-                                                                        {row.expirationDate
-                                                                            ? format(row.expirationDate, "yyyy/MM/dd")
-                                                                            : "有效日期"}
+                                                                            <CalendarIcon className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                                                                            {row.expirationDate
+                                                                                ? format(row.expirationDate, "yyyy/MM/dd")
+                                                                                : "有效日期"}
                                                                         </Button>
                                                                     }
                                                                 />
@@ -519,7 +478,6 @@ export const StockAdjustment = ({
                                                                         mode="single"
                                                                         selected={row.expirationDate}
                                                                         onSelect={(date) => handleExpirationDateChange(row.variantId, date)}
-
                                                                     />
                                                                 </PopoverContent>
                                                             </Popover>

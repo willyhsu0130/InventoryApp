@@ -159,6 +159,7 @@ export const Products = () => {
 
                     {/* Plus Button */}
                     <Button
+                        id="createButton"
                         type="button"
                         variant="secondary"
                         size="icon"

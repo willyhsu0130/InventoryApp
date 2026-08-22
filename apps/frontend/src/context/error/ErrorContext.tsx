@@ -1,10 +1,13 @@
 import { createContext } from "react";
 
-export type ErrorContextType = {
-    errorMessage: string
-    setErrorMessage: React.Dispatch<React.SetStateAction<string>>;
-    warningMessage: string
-    setWarningMessage: React.Dispatch<React.SetStateAction<string>>;
-    clearErrorMessages: () => void
-};
-export const ErrorContext = createContext<ErrorContextType | undefined>(undefined);
+export interface ErrorContextType {
+    errorMessage: string;
+    warningMessage: string;
+    setErrorMessage: (msg: string) => void;
+    setWarningMessage: (msg: string) => void;
+    clearError: () => void;
+    clearWarning: () => void;
+    clearAll: () => void;
+}
+
+export const ErrorContext = createContext<ErrorContextType | null>(null);

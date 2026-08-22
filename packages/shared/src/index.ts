@@ -1,112 +1,41 @@
-// packages/shared/src/index.ts
+// /packages/shared/src/index.ts
 
-// ==========================================
-// 1. INVENTORY DOMAIN
-// ==========================================
+// Batch Types
+export type { Batch } from "./models/batch";
+
+// Customer Types
+export type { Customer } from "./models/customer";
+
+// Inventory Level Types
+export type { InventoryLevel } from "./models/inventoryLevel";
+
+// Inventory Movement Types
 export type {
-  KatanaInventoryItem,
-  KatanaTraceabilityEntry,
-  KatanaBatchTransaction,
-  KatanaBatch,
-  KatanaBatchStock,
-  KatanaCreateBatchInput,
-  KatanaUpdateBatchInput,
-  KatanaStockAdjustmentRowInput,
-  KatanaStockAdjustmentInput,
-  CreateStockAdjustmentRowPayload,
-  CreateStockAdjustmentPayload,
-  KatanaUpdateStockAdjustmentPayload,
-  KatanaStockAdjustmentRow,
-  KatanaStockAdjustment,
-} from "./models/inventory";
+    InventoryMovement,
+    InventoryMovementList,
+} from "./models/inventoryMovement";
 
-export {
-  convertStockAdjustmentToCreatePayload,
-  convertStockAdjustmentToUpdatePayload,
-} from "./models/inventory";
+// Location Types
+export type { Location } from "./models/location";
 
-// ==========================================
-// 2. CUSTOMER DOMAIN
-// ==========================================
+// Product Types
 export type {
-  KatanaCustomerAddressInput,
-  KatanaCustomerAddress,
-  KatanaCustomerInput,
-  KatanaCustomer,
-  CreateCustomerAddressPayload,
-  CreateCustomerPayload,
-  UpdateCustomerPayload,
-  KatanaCustomerDraft,
-} from "./models/customers";
-
-export {
-  convertCustomerToCreatePayload,
-  convertCustomerToUpdatePayload,
-} from "./models/customers";
-
-// ==========================================
-// 3. PRODUCT DOMAIN
-// ==========================================
-export type {
-  KatanaProductConfig,
-  KatanaProductInput,
-  KatanaProduct,
-  KatanaProductDraft,
-  KatanaCreateProductPayload,
-  KatanaUpdateProductPayload,
+    ProductConfig,
+    Product,
 } from "./models/product";
 
-export {
-  UNSAVED_PRODUCT_ID,
-  isUnsavedProduct,
-  createEmptyProductDraft,
-  convertProductToPayload,
-  convertProductToCreatePayload,
-} from "./models/product";
-
-// ==========================================
-// 4. VARIANT DOMAIN
-// ==========================================
+// Variant Types
 export type {
-  VariantConfigAttribute,
-  VariantRow,
-  VariantInsert,
-  VariantUpdate,
-  ProductVariant,
-  CreateVariantInput,
-  UpdateVariantInput,
+    VariantConfigAttribute,
+    Variant,
 } from "./models/variant";
 
-// ==========================================
-// 5. SALES ORDER DOMAIN
-// ==========================================
+// Sales Order Types
 export type {
-  KatanaSalesOrderStatus,
-  KatanaProductAvailability,
-  KatanaIngredientAvailability,
-  KatanaProductionStatus,
-  KatanaSalesOrder,
-  KatanaSalesOrderRow,
-  KatanaSalesOrderRowAttribute,
-  KatanaSalesOrderAddress,
-  KatanaSalesOrderShippingFee,
-  EnrichedSalesOrder,
-  EnrichedSalesOrderRow,
-  KatanaSalesOrderDraft,
-  CreateSalesOrderPayload,
-  CreateSalesOrderRowPayload,
-  CreateSalesOrderAddressPayload,
-  UpdateSalesOrderPayload,
-  UpdateSalesOrderRowPayload,
+    SalesOrderItem,
+    SalesOrder,
+    CreateSalesOrderPayload,
 } from "./models/salesOrder";
 
-export {
-  convertSalesOrderToCreatePayload,
-  convertSalesOrderToUpdatePayload,
-} from "./models/salesOrder";
-
-// ==========================================
-// 6. SUPABASE & DATABASE TYPES
-// ==========================================
 export * from "./models/database.types";
-export type { Database } from "./models/database.types";
+export * from "./models/supabaseError"

@@ -6,7 +6,7 @@ import {
     type ReactNode,
 } from "react";
 import { InventoryContext } from "./InventoryContext";
-import { inventoryService } from "@/services/inventoryService"
+import { inventoryService } from "@/services/inventoryMovementService"
 import type {
     KatanaInventoryItem,
     KatanaBatch,

@@ -1,26 +1,39 @@
-import type { ReactNode } from "react";
-import { useState } from "react";
-import { ErrorContext } from "@/context/error/ErrorContext";
+import { useState, useCallback, useMemo, type ReactNode, type FC } from "react";
+import { ErrorContext, type ErrorContextType } from "./ErrorContext";
 
-export const ErrorProvider = ({ children }: { children: ReactNode }) => {
-
+export const ErrorProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const [errorMessage, setErrorMessage] = useState<string>("");
-    const [warningMessage, setWarningMessage] = useState<string>("")
+    const [warningMessage, setWarningMessage] = useState<string>("");
 
-    const clearErrorMessages = () => {
+    const clearError = useCallback(() => {
+        setErrorMessage("");
+    }, []);
+
+    const clearWarning = useCallback(() => {
+        setWarningMessage("");
+    }, []);
+
+    const clearAll = useCallback(() => {
         setErrorMessage("");
         setWarningMessage("");
-    }
-    const value = {
-        errorMessage,
-        setErrorMessage,
-        warningMessage,
-        setWarningMessage,
-        clearErrorMessages
-    }
+    }, []);
+
+    const value = useMemo<ErrorContextType>(
+        () => ({
+            errorMessage,
+            warningMessage,
+            setErrorMessage,
+            setWarningMessage,
+            clearError,
+            clearWarning,
+            clearAll,
+        }),
+        [errorMessage, warningMessage, clearError, clearWarning, clearAll]
+    );
+
     return (
         <ErrorContext.Provider value={value}>
             {children}
         </ErrorContext.Provider>
     );
-}
+};

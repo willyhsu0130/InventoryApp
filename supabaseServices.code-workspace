@@ -1,0 +1,30 @@
+{
+  "folders": [
+    {
+      "name": "Services",
+      "path": "apps/frontend/src/services"
+    },
+    {
+      "name": "Models",
+      "path": "packages/shared/src"
+    },
+    {
+      "name": "Supabase Backend",
+      "path": "supabase"
+    }
+  ],
+  "settings": {
+    "files.autoSave": "afterDelay",
+    "editor.formatOnSave": true,
+    "files.associations": {
+      "*.sql": "pgsql"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "vitest.explorer"
+    ]
+  }
+}

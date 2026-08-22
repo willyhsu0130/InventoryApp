@@ -1,27 +1,34 @@
 // apps/frontend/src/lib/supabase.ts
-import { createClient, type PostgrestError } from "@supabase/supabase-js";
+import { createClient, type PostgrestResponse, type PostgrestSingleResponse } from "@supabase/supabase-js";
 import { type Database, SupabaseError } from "@my-inventory-app/shared";
+import dotenv from "dotenv";
+import path from "path";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey =
-    import.meta.env.VITE_SUPABASE_ANON_KEY ||
-    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Load root environment files when running in Node.js / Vitest
+if (typeof window === "undefined") {
+    dotenv.config({ path: path.resolve(process.cwd(), ".env.test") });
+    dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+}
+
+// Resolve variables in both Vite (browser) and Node.js (Vitest)
+const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+
 
 if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-        "Missing Supabase environment variables! Check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY."
+        "Missing Supabase environment variables! Check your root .env.test or frontend .env file for VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY / VITE_SUPABASE_ANON_KEY."
     );
 }
-
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
     auth: {
-        persistSession: true,
-        autoRefreshToken: true,
+        persistSession: typeof window !== "undefined",
+        autoRefreshToken: typeof window !== "undefined",
     },
 });
 
 export async function unwrap<T>(
-    queryPromise: PromiseLike<{ data: T; error: PostgrestError | null }>
+    queryPromise: PromiseLike<PostgrestSingleResponse<T> | PostgrestResponse<T>>
 ): Promise<NonNullable<T>> {
     const { data, error } = await queryPromise;
 

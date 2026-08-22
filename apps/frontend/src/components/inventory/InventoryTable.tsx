@@ -1,7 +1,6 @@
-// src/components/inventory/InventoryTable.tsx
-import { useContext } from "react";
-import type { KatanaInventoryItem } from "../../models/katana/inventory";
-import { ProductContext } from "../../context/product/ProductContext";
+// apps/frontend/src/components/inventory/InventoryTable.tsx
+import { useProductCatalog, useVariant } from "@/hooks/useContexts";
+import type { KatanaInventoryItem } from "@my-inventory-app/shared"
 import { DataTable, type Column } from "../DataTable";
 
 interface InventoryTableProps {
@@ -11,20 +10,37 @@ interface InventoryTableProps {
 }
 
 export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
-    const productCtx = useContext(ProductContext);
+    const { products } = useProductCatalog();
+    const { variants } = useVariant();
 
-    // Define column schemas tailored to inventory items
+    const getDetails = (variantId: number) => {
+        const variant = variants.get(variantId);
+        const product = variant ? products.get(variant.product_id) : undefined;
+
+        const detailsString = variant?.config_attributes
+            ?.map((attr) => attr.config_value)
+            .filter(Boolean)
+            .join(" / ");
+
+        return {
+            product_name: product?.name ?? `Variant #${variantId}`,
+            variant_details: detailsString || undefined,
+            sku: variant?.sku || "N/A",
+            uom: product?.uom || "",
+        };
+    };
+
     const columns: Column<KatanaInventoryItem>[] = [
         {
             header: "商品 / 規格",
             render: (item) => {
-                const details = productCtx?.getVariantDetails(item.variant_id);
+                const details = getDetails(item.variant_id);
                 return (
                     <div className="font-sans">
                         <div className="font-medium text-foreground text-sm">
-                            {details?.product_name ?? `Variant #${item.variant_id}`}
+                            {details.product_name}
                         </div>
-                        {details?.variant_details && (
+                        {details.variant_details && (
                             <div className="text-xs text-muted-foreground mt-0.5">
                                 {details.variant_details}
                             </div>
@@ -36,10 +52,10 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
         {
             header: "SKU",
             render: (item) => {
-                const details = productCtx?.getVariantDetails(item.variant_id);
+                const details = getDetails(item.variant_id);
                 return (
                     <span className="text-slate-400 font-mono text-xs">
-                        {details?.sku || "N/A"}
+                        {details.sku}
                     </span>
                 );
             },
@@ -48,12 +64,12 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             header: "現貨",
             align: "right",
             render: (item) => {
-                const details = productCtx?.getVariantDetails(item.variant_id);
+                const details = getDetails(item.variant_id);
                 return (
                     <span className="font-bold text-foreground">
-                        {parseFloat(item.quantity_in_stock)}{" "}
+                        {item.quantity_in_stock}{" "}
                         <span className="text-muted-foreground font-normal text-[10px]">
-                            {details?.uom}
+                            {details.uom}
                         </span>
                     </span>
                 );
@@ -64,7 +80,7 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             align: "right",
             render: (item) => (
                 <span className="text-foreground">
-                    {parseFloat(item.quantity_committed)}
+                    {item.quantity_committed}
                 </span>
             ),
         },
@@ -73,7 +89,7 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             align: "right",
             render: (item) => (
                 <span className="text-foreground">
-                    {parseFloat(item.quantity_expected)}
+                    {item.quantity_expected}
                 </span>
             ),
         },
@@ -81,7 +97,8 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             header: "狀態",
             align: "center",
             render: (item) => {
-                const missingOrExcess = parseFloat(item.quantity_missing_or_excess);
+                // Coalesce null/undefined to 0
+                const missingOrExcess = item.quantity_missing_or_excess ?? 0;
                 const isShortage = missingOrExcess < 0;
 
                 return isShortage ? (
@@ -100,7 +117,7 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             align: "right",
             render: (item) => (
                 <span className="text-slate-300">
-                    ${parseFloat(item.average_cost).toFixed(2)}
+                    ${item.average_cost.toFixed(2)}
                 </span>
             ),
         },
@@ -109,7 +126,7 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             align: "right",
             render: (item) => (
                 <span className="text-emerald-400 font-medium">
-                    ${parseFloat(item.value_in_stock).toLocaleString(undefined, {
+                    ${item.value_in_stock.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                     })}
                 </span>
@@ -122,11 +139,10 @@ export const InventoryTable = ({ items, onRowClick }: InventoryTableProps) => {
             <DataTable
                 data={items}
                 columns={columns}
-                keyExtractor={(item) => `${item.variant_id}-${item.location_id}`}
+                keyExtractor={(item) => `${item.variant_id}`}
                 onRowClick={onRowClick ? (item) => onRowClick(item.variant_id) : undefined}
                 emptyMessage="No matching inventory items found."
             />
         </div>
-
     );
 };

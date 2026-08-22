@@ -1,97 +1,153 @@
 import { supabase, unwrap } from "@/lib/supabase";
-import type {
-    CreateVariantInput,
-    UpdateVariantInput,
-    ProductVariant,
-    Database,
-    Json,
-} from "@my-inventory-app/shared";
+import type { Variant, VariantConfigAttribute, Database, ProductConfig } from "@my-inventory-app/shared";
+import { getProductById } from "./productService";
 
-type VariantInsert = Database["public"]["Tables"]["product_variants"]["Insert"];
-type VariantUpdate = Database["public"]["Tables"]["product_variants"]["Update"];
+type VariantRow = Database["public"]["Tables"]["variants"]["Row"];
 
-export const variantService = {
-    // Fetch all variants
-    async getAll(): Promise<ProductVariant[]> {
-        const data = await unwrap(
-            supabase
-                .from("product_variants")
-                .select("*")
-                .order("created_at", { ascending: false })
-        );
+function toVariantDomain(row: VariantRow): Variant {
+    return {
+        id: row.id,
+        productId: row.product_id,
+        sku: row.sku ?? null,
+        salesPrice: Number(row.sales_price ?? 0),
+        configs: (row.configs as unknown as VariantConfigAttribute[]) ?? [],
+        isArchived: row.is_archived,
+    };
+}
 
-        return data as unknown as ProductVariant[];
-    },
+/**
+ * Validates that all variant config attributes exist and have allowed values in the parent product configs
+ */
+function validateVariantConfigsAgainstParent(
+    parentConfigs: ProductConfig[],
+    variantConfigs: VariantConfigAttribute[]
+) {
+    if (!variantConfigs || variantConfigs.length === 0) return;
 
-    // Create single variant (inventory level is initialized via DB trigger)
-    async create(input: CreateVariantInput): Promise<ProductVariant> {
-        const insertPayload: VariantInsert = {
-            product_id: input.product_id,
-            sku: input.sku?.trim() ? input.sku.trim() : null, // Ensures "" becomes NULL
-            sales_price: input.sales_price ?? 0,
-            purchase_price: input.purchase_price ?? 0,
-            internal_barcode: input.internal_barcode?.trim() || null,
-            registered_barcode: input.registered_barcode?.trim() || null,
-            supplier_item_codes: input.supplier_item_codes?.filter(Boolean) ?? [],
-            config_attributes: (input.config_attributes ?? []) as unknown as Json,
-            custom_fields: (input.custom_fields ?? []) as unknown as Json,
-        };
+    for (const attr of variantConfigs) {
+        const parentDef = parentConfigs.find((pc) => pc.name === attr.name);
+        if (!parentDef) {
+            throw new Error(
+                `Invalid variant config name: "${attr.name}" does not exist in parent product configs.`
+            );
+        }
 
-        const variant = await unwrap(
-            supabase
-                .from("product_variants")
-                .insert(insertPayload)
-                .select()
-                .single()
-        );
+        if (!parentDef.value.includes(attr.value)) {
+            throw new Error(
+                `Invalid variant config value: "${attr.value}" is not an allowed value for "${attr.name}". Allowed: [${parentDef.value.join(", ")}]`
+            );
+        }
+    }
+}
 
-        return variant as unknown as ProductVariant;
-    },
+export async function createVariant(
+    payload: Omit<Variant, "id" | "isArchived">
+): Promise<Variant> {
+    // 1. Fetch parent product to validate configs (also asserts parent product exists)
+    const parentProduct = await getProductById(payload.productId);
 
-    // Update variant by ID
-    async update(id: number, input: UpdateVariantInput): Promise<ProductVariant> {
-        const updatePayload: VariantUpdate = {
-            ...(input.sku !== undefined && {
-                sku: input.sku?.trim() ? input.sku.trim() : null,
-            }),
-            ...(input.sales_price !== undefined && { sales_price: input.sales_price }),
-            ...(input.purchase_price !== undefined && { purchase_price: input.purchase_price }),
-            ...(input.internal_barcode !== undefined && {
-                internal_barcode: input.internal_barcode?.trim() || null,
-            }),
-            ...(input.registered_barcode !== undefined && {
-                registered_barcode: input.registered_barcode?.trim() || null,
-            }),
-            ...(input.supplier_item_codes !== undefined && {
-                supplier_item_codes: input.supplier_item_codes.filter(Boolean),
-            }),
-            ...(input.config_attributes !== undefined && {
-                config_attributes: input.config_attributes as unknown as Json,
-            }),
-            ...(input.custom_fields !== undefined && {
-                custom_fields: input.custom_fields as unknown as Json,
-            }),
-        };
+    // 2. Validate configs against parent definition
+    if (payload.configs && payload.configs.length > 0) {
+        validateVariantConfigsAgainstParent(parentProduct.configs ?? [], payload.configs);
+    }
 
-        const data = await unwrap(
-            supabase
-                .from("product_variants")
-                .update(updatePayload)
-                .eq("id", id)
-                .select()
-                .single()
-        );
+    const row = await unwrap(
+        supabase
+            .from("variants")
+            .insert({
+                product_id: payload.productId,
+                sku: payload.sku,
+                sales_price: payload.salesPrice,
+                configs: payload.configs as  VariantConfigAttribute[],
+                is_archived: false,
+            })
+            .select()
+            .single()
+    );
 
-        return data as unknown as ProductVariant;
-    },
+    return toVariantDomain(row);
+}
 
-    // Delete variant
-    async delete(id: number): Promise<void> {
-        await unwrap(
-            supabase
-                .from("product_variants")
-                .delete()
-                .eq("id", id)
-        );
-    },
-};
+export async function getVariantById(id: number): Promise<Variant> {
+    const row = await unwrap(
+        supabase
+            .from("variants")
+            .select("*")
+            .eq("id", id)
+            .single()
+    );
+
+    return toVariantDomain(row);
+}
+
+export async function getVariantsByProductId(productId: number): Promise<Variant[]> {
+    const rows = await unwrap(
+        supabase
+            .from("variants")
+            .select("*")
+            .eq("product_id", productId)
+            .order("id", { ascending: true })
+    );
+
+    return rows.map(toVariantDomain);
+}
+
+export async function getActiveVariantsByProductId(productId: number): Promise<Variant[]> {
+    const rows = await unwrap(
+        supabase
+            .from("variants")
+            .select("*")
+            .eq("product_id", productId)
+            .eq("is_archived", false)
+            .order("id", { ascending: true })
+    );
+
+    return rows.map(toVariantDomain);
+}
+
+export async function updateVariant(
+    id: number,
+    payload: Partial<Omit<Variant, "id" | "productId">>
+): Promise<Variant> {
+    const updateData: Database["public"]["Tables"]["variants"]["Update"] = {};
+
+    if (payload.sku !== undefined) updateData.sku = payload.sku;
+    if (payload.salesPrice !== undefined) updateData.sales_price = payload.salesPrice;
+    if (payload.isArchived !== undefined) updateData.is_archived = payload.isArchived;
+
+    // Validate new configs if updating them
+    if (payload.configs !== undefined) {
+        const currentVariant = await getVariantById(id);
+        const parentProduct = await getProductById(currentVariant.productId);
+        validateVariantConfigsAgainstParent(parentProduct.configs ?? [], payload.configs);
+        updateData.configs = payload.configs as VariantConfigAttribute[];
+    }
+
+    if (Object.keys(updateData).length === 0) {
+        return getVariantById(id);
+    }
+
+    const row = await unwrap(
+        supabase
+            .from("variants")
+            .update(updateData)
+            .eq("id", id)
+            .select()
+            .single()
+    );
+
+    return toVariantDomain(row);
+}
+
+export async function deleteVariant(id: number): Promise<Variant> {
+    const row = await unwrap(
+        supabase
+            .from("variants")
+            .update({ is_archived: true })
+            .eq("id", id)
+            .select()
+            .single()
+    );
+
+    return toVariantDomain(row);
+}

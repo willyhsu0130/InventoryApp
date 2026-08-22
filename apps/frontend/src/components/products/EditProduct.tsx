@@ -43,8 +43,8 @@ export interface LocalVariantDraft {
     config_attributes: VariantConfigAttribute[];
 }
 
-interface EditProductProps {
-    id: number;
+export interface EditProductProps {
+    id?: number | null;
     onSavingChange?: (isSaving: boolean) => void;
     onCreated?: (productId: number) => void;
     ref?: Ref<EditProductHandle>;
@@ -56,8 +56,7 @@ export const EditProduct: FC<EditProductProps> = ({
     onCreated,
     ref,
 }) => {
-    const isCreating = isUnsavedProduct(id);
-
+    const isCreating = id == null || isUnsavedProduct(id);
     const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const [draftConfigs, setDraftConfigs] = useState<KatanaProductConfig[]>([]);
@@ -68,9 +67,9 @@ export const EditProduct: FC<EditProductProps> = ({
     const { variants: allVariants, createVariant, editVariant, deleteVariant, refetchVariants } = useVariant();
     const { inventoryItems } = useInventoryCatalog();
 
-    const product = products.get(id);
+    const product = id != null ? products.get(id) : undefined;
 
-    // Form State initialized once per product ID (remounted by key in parent modal)
+    // Form State
     const [formProduct, setFormProduct] = useState<KatanaProductDraft>(() => {
         if (product) {
             return {
@@ -95,34 +94,57 @@ export const EditProduct: FC<EditProductProps> = ({
         return createEmptyProductDraft();
     });
 
+    // 1. Freeze initial variant ID sequence on component mount
+    const [initialVariantOrder, setInitialVariantOrder] = useState<number[]>(() => {
+        if (isCreating || id == null) return [];
+        return Array.from(allVariants.values())
+            .filter((v: ProductVariant) => v.product_id === id)
+            .map((v) => v.id);
+    });
+
+    // In-flight edits for existing variants (keyed by variant id)
+    const [localEdits, setLocalEdits] = useState<Map<number, Partial<LocalVariantDraft>>>(() => new Map());
+
     // Local draft rows for new products or pending unsaved variant additions
-    const [draftVariants, setDraftVariants] = useState<LocalVariantDraft[]>(() => {
+    const [newDraftVariants, setNewDraftVariants] = useState<LocalVariantDraft[]>(() => {
         if (isCreating) {
             return [{ config_attributes: [] }];
         }
         return [];
     });
 
-    // Derive all active rows by combining context variants with any local draft rows
+    // 2. Active list preserves the initial frozen ordering
     const activeVariants = useMemo<LocalVariantDraft[]>(() => {
-        if (isCreating) {
-            return draftVariants;
+        if (isCreating || id == null) {
+            return newDraftVariants;
         }
 
-        const saved: LocalVariantDraft[] = Array.from(allVariants.values())
+        const savedRows: LocalVariantDraft[] = Array.from(allVariants.values())
             .filter((v: ProductVariant) => v.product_id === id)
-            .map((v) => ({
-                id: v.id,
-                sku: v.sku ?? "",
-                sales_price: v.sales_price ?? 0,
-                purchase_price: v.purchase_price ?? 0,
-                config_attributes: Array.isArray(v.config_attributes)
-                    ? (v.config_attributes as unknown as VariantConfigAttribute[])
-                    : [],
-            }));
+            .map((v) => {
+                const patch = localEdits.get(v.id) ?? {};
+                return {
+                    id: v.id,
+                    sku: patch.sku !== undefined ? patch.sku : (v.sku ?? ""),
+                    sales_price: patch.sales_price !== undefined ? patch.sales_price : (v.sales_price ?? 0),
+                    purchase_price: patch.purchase_price !== undefined ? patch.purchase_price : (v.purchase_price ?? 0),
+                    config_attributes: patch.config_attributes !== undefined
+                        ? patch.config_attributes
+                        : (Array.isArray(v.config_attributes) ? v.config_attributes : []),
+                };
+            })
+            // Sort by the initial frozen order; any newly added saved variants sit at the end
+            .sort((a, b) => {
+                const idxA = a.id ? initialVariantOrder.indexOf(a.id) : -1;
+                const idxB = b.id ? initialVariantOrder.indexOf(b.id) : -1;
+                if (idxA === -1 && idxB === -1) return 0;
+                if (idxA === -1) return 1;
+                if (idxB === -1) return -1;
+                return idxA - idxB;
+            });
 
-        return [...saved, ...draftVariants];
-    }, [allVariants, draftVariants, id, isCreating]);
+        return [...savedRows, ...newDraftVariants];
+    }, [allVariants, id, initialVariantOrder, isCreating, localEdits, newDraftVariants]);
 
     // Variant change handler
     const commitVariantChange = async (
@@ -132,9 +154,9 @@ export const EditProduct: FC<EditProductProps> = ({
     ) => {
         const updated: LocalVariantDraft = { ...targetVariant, ...patch };
 
-        // 1. In Create Mode: update draft state in place
+        // 1. Create Mode: update draft state in place
         if (isCreating) {
-            setDraftVariants((prev) => {
+            setNewDraftVariants((prev) => {
                 const next = [...prev];
                 next[draftIndex] = updated;
                 return next;
@@ -142,15 +164,14 @@ export const EditProduct: FC<EditProductProps> = ({
             return;
         }
 
-        // 2. In Edit Mode: check whether it's an unsaved draft row or an existing variant
+        // 2. Edit Mode: Unsaved new draft row
         if (targetVariant.id === undefined) {
             const hasUnfilledConfigs = updated.config_attributes.some(
                 (attr) => !attr.config_value || attr.config_value.trim() === ""
             );
 
-            // If configuration options are incomplete, keep it local in draftVariants
             if (hasUnfilledConfigs) {
-                setDraftVariants((prev) => {
+                setNewDraftVariants((prev) => {
                     const next = [...prev];
                     next[draftIndex] = updated;
                     return next;
@@ -158,18 +179,23 @@ export const EditProduct: FC<EditProductProps> = ({
                 return;
             }
 
-            // Complete: insert to database and remove from draft state
+            if (id == null) return;
+
             onSavingChange?.(true);
             try {
                 const input: CreateVariantInput = {
                     product_id: id,
-                    sku: updated.sku?.trim() ? updated.sku.trim() : null, // <-- Convert "" to null
+                    sku: updated.sku?.trim() ? updated.sku.trim() : null,
                     sales_price: updated.sales_price ?? 0,
                     purchase_price: updated.purchase_price ?? 0,
                     config_attributes: updated.config_attributes,
                 };
-                await createVariant(input);
-                setDraftVariants((prev) => prev.filter((_, idx) => idx !== draftIndex));
+                const created = await createVariant(input);
+                if (created?.id) {
+                    // Append new variant to the frozen ordering so it stays in place
+                    setInitialVariantOrder((prev) => [...prev, created.id]);
+                }
+                setNewDraftVariants((prev) => prev.filter((_, idx) => idx !== draftIndex));
                 await refetchVariants();
             } catch (error) {
                 setFormError(error instanceof Error ? error.message : "儲存款式失敗。");
@@ -177,7 +203,16 @@ export const EditProduct: FC<EditProductProps> = ({
                 onSavingChange?.(false);
             }
         } else {
-            // Existing row: update database directly
+            // 3. Edit Mode: Existing row update
+            setLocalEdits((prev) => {
+                const next = new Map(prev);
+                next.set(targetVariant.id!, {
+                    ...next.get(targetVariant.id!),
+                    ...patch,
+                });
+                return next;
+            });
+
             onSavingChange?.(true);
             try {
                 const updateInput: UpdateVariantInput = {
@@ -205,26 +240,26 @@ export const EditProduct: FC<EditProductProps> = ({
     };
 
     const commitProductPatch = async (patch: Partial<KatanaProductDraft> = {}) => {
-        let nextProduct: KatanaProductDraft;
+        const nextProduct: KatanaProductDraft = {
+            ...formProduct,
+            ...patch,
+        };
 
-        setFormProduct((prev) => {
-            nextProduct = { ...prev, ...patch };
-            return nextProduct;
-        });
+        setFormProduct(nextProduct);
 
         if (isCreating || !product) return;
 
         const hasChanges =
-            nextProduct!.name !== product.name ||
-            nextProduct!.uom !== product.uom ||
-            nextProduct!.batch_tracked !== product.batch_tracked ||
-            nextProduct!.serial_tracked !== product.serial_tracked;
+            nextProduct.name !== product.name ||
+            nextProduct.uom !== product.uom ||
+            nextProduct.batch_tracked !== product.batch_tracked ||
+            nextProduct.serial_tracked !== product.serial_tracked;
 
         if (!hasChanges) return;
 
         onSavingChange?.(true);
         try {
-            await editProduct(nextProduct!);
+            await editProduct(nextProduct);
             await refetchProducts();
         } catch (err) {
             console.error("Failed auto-save:", err);
@@ -259,7 +294,6 @@ export const EditProduct: FC<EditProductProps> = ({
         onSavingChange?.(true);
 
         try {
-            // Single atomic transaction
             const result = await productService.createProductWithVariants(
                 formProduct,
                 activeVariants
@@ -372,7 +406,7 @@ export const EditProduct: FC<EditProductProps> = ({
             config_attributes: defaultAttributes,
         };
 
-        setDraftVariants((prev) => [...prev, newVariantDraft]);
+        setNewDraftVariants((prev) => [...prev, newVariantDraft]);
     };
 
     const handleDeleteVariant = async (variant: LocalVariantDraft, draftIndex: number) => {
@@ -382,9 +416,16 @@ export const EditProduct: FC<EditProductProps> = ({
         }
 
         if (variant.id === undefined) {
-            setDraftVariants((prev) => prev.filter((_, idx) => idx !== draftIndex));
+            setNewDraftVariants((prev) => prev.filter((_, idx) => idx !== draftIndex));
             return;
         }
+
+        setInitialVariantOrder((prev) => prev.filter((item) => item !== variant.id));
+        setLocalEdits((prev) => {
+            const next = new Map(prev);
+            next.delete(variant.id!);
+            return next;
+        });
 
         onSavingChange?.(true);
         try {
@@ -397,7 +438,7 @@ export const EditProduct: FC<EditProductProps> = ({
         }
     };
 
-    const hasUnsavedVariant = !isCreating && draftVariants.length > 0;
+    const hasUnsavedVariant = !isCreating && newDraftVariants.length > 0;
 
     return (
         <div className="flex flex-col gap-y-5">
@@ -523,9 +564,8 @@ export const EditProduct: FC<EditProductProps> = ({
                     </thead>
                     <tbody className="font-mono text-xs">
                         {activeVariants.map((variant, index) => {
-                            // Calculate draft array index if it's an unsaved item
                             const draftIndex = variant.id === undefined
-                                ? (isCreating ? index : index - (activeVariants.length - draftVariants.length))
+                                ? (isCreating ? index : index - (activeVariants.length - newDraftVariants.length))
                                 : -1;
 
                             const currentStock =
