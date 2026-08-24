@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-    convertCustomerToCreatePayload,
-    convertCustomerToUpdatePayload,
-    type KatanaCustomer,
-    type KatanaCustomerDraft,
+    type Customer,
 } from "@my-inventory-app/shared";
 
 import { CustomersContext } from "@/context/customers/CustomersContext";

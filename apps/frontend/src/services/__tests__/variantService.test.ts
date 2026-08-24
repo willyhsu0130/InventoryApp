@@ -49,8 +49,8 @@ describe("Variant Service", () => {
 
         // 2. Create a parent product with configs
         const configs: ProductConfig[] = [
-            { id: 1, name: "Grind Size", value: ["Fine", "Medium", "Coarse"] },
-            { id: 2, name: "Roast Level", value: ["Light", "Dark"] },
+            { name: "Grind Size", values: ["Fine", "Medium", "Coarse"] },
+            { name: "Roast Level", values: ["Light", "Dark"] },
         ];
 
         configuredProduct = await createProduct({
@@ -347,13 +347,70 @@ describe("Variant Service", () => {
                 configs: identicalConfigs,
             };
 
-            try {
-                const second = await createVariant(duplicateAttempt);
-                if (second?.id) createdVariantIds.push(second.id);
-                expect.unreachable("Should reject identical variant config combination");
-            } catch (err) {
-                expect(err).toBeDefined();
-            }
+            await expect(createVariant(duplicateAttempt)).rejects.toThrow();
+        });
+
+        it("POST: rejects duplicate active variants with permuted/reversed config attribute order", async () => {
+            // Reversed array order: Roast Level first, Grind Size second (matching SKU-COMBO-1)
+            const permutedConfigs: VariantConfigAttribute[] = [
+                { name: "Roast Level", value: "Dark" },
+                { name: "Grind Size", value: "Fine" },
+            ];
+
+            await expect(
+                createVariant({
+                    productId: configuredProduct.id,
+                    sku: `SKU-COMBO-PERM-${Date.now()}`,
+                    salesPrice: 24,
+                    configs: permutedConfigs,
+                })
+            ).rejects.toThrow();
+        });
+
+        it("POST: allows creating a variant on the SAME product if at least one config value differs", async () => {
+            const distinctConfigs: VariantConfigAttribute[] = [
+                { name: "Grind Size", value: "Coarse" }, // Different value
+                { name: "Roast Level", value: "Dark" },
+            ];
+
+            const variant = await createVariant({
+                productId: configuredProduct.id,
+                sku: `SKU-DISTINCT-${Date.now()}`,
+                salesPrice: 28,
+                configs: distinctConfigs,
+            });
+
+            expect(variant.id).toBeTypeOf("number");
+            expect(variant.configs).toEqual(distinctConfigs);
+            createdVariantIds.push(variant.id);
+        });
+
+        it("POST: allows the exact same config combination on a DIFFERENT product", async () => {
+            // Same configs as configuredProduct, but assigned to baseProduct
+            const secondConfigProduct = await createProduct({
+                name: `Second Config Product ${Date.now()}`,
+                uom: "bags",
+                batchTracked: false,
+                configs: [
+                    { name: "Grind Size", values: ["Fine", "Medium", "Coarse"] },
+                    { name: "Roast Level", values: ["Light", "Dark"] },
+                ],
+            });
+            createdProductIds.push(secondConfigProduct.id);
+
+            const variant = await createVariant({
+                productId: secondConfigProduct.id,
+                sku: `SKU-DIFF-PROD-${Date.now()}`,
+                salesPrice: 25,
+                configs: [
+                    { name: "Grind Size", value: "Fine" },
+                    { name: "Roast Level", value: "Dark" },
+                ],
+            });
+
+            expect(variant.id).toBeTypeOf("number");
+            expect(variant.productId).toBe(secondConfigProduct.id);
+            createdVariantIds.push(variant.id);
         });
     });
 });

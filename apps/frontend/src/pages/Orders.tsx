@@ -1,142 +1,232 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+// src/pages/Orders.tsx
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { PageLayout } from "../components/PageLayout";
-import { OrdersTable } from "@/components/orders/OrdersTable";
-import { useError } from "../hooks/useError";
+import { OrdersTable, type DisplaySalesOrderItem, type DisplaySalesOrderRow } from "@/components/orders/OrdersTable";
 import {
     CONTROL_INPUT,
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
 } from "../lib/styles";
-import {
-    useOrdersCatalog,
-    useProductCatalog,
-    useCustomersCatalog,
-    useInventoryCatalog,
-} from "../hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { EditOrder, type EditOrderHandle } from "@/components/orders/EditOrder";
 import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/RefreshButton";
-import { printSalesOrderPDF } from "@/lib/exportOrder";
-import { katanaFetch } from "@/lib/katanaFetch";
-import { KATANA_API_ROUTES } from "@/lib/routes/routes";
-import type { KatanaLocation } from "@/models/katana/common";
+// import { printSalesOrderPDF } from "@/lib/exportOrder";
+import type { Customer, Location, Product, SalesOrder, Variant } from "@my-inventory-app/shared";
+import {
+    getSalesOrdersByStatus,
+    getSalesOrderById,
+} from "@/services/salesOrderService";
+import { getCustomers } from "@/services/customerService";
+import { getLocations } from "@/services/locationService";
+import { getActiveVariants } from "@/services/variantService";
+import { getActiveProducts } from "@/services/productService";
 
-/** null = closed, -1 = new order, number = prefilled order id */
+const UNSAVED_ORDER_ID = -1;
+
 type OrderTarget = { orderId: number } | null;
 
-export const Orders = () => {
-    // 1. Access all provider catalogs
-    const { orders, loading: loadingOrders, refetchOrders, deleteOrder } = useOrdersCatalog();
-    const { getVariantDetails, loading: loadingProducts } = useProductCatalog();
-    const { getCustomerName, loading: loadingCustomers } = useCustomersCatalog();
-    const { loading: loadingInventory } = useInventoryCatalog();
+async function loadSalesOrdersCatalog(): Promise<DisplaySalesOrderRow[]> {
+    // 1. Fetch pending & completed orders alongside entity metadata in parallel
+    const [
+        pendingOrders,
+        completedOrders,
+        customers,
+        locations,
+        variants,
+        products,
+    ] = await Promise.all([
+        getSalesOrdersByStatus("PENDING").catch(() => [] as SalesOrder[]),
+        getSalesOrdersByStatus("COMPLETED").catch(() => [] as SalesOrder[]),
+        getCustomers().catch(() => [] as Customer[]),
+        getLocations().catch(() => [] as Location[]),
+        getActiveVariants().catch(() => [] as Variant[]),
+        getActiveProducts().catch(() => [] as Product[]),
+    ]);
 
-    const { errorMessage } = useError();
+    const allOrders = [...pendingOrders, ...completedOrders].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    // 2. Build fast O(1) lookup maps
+    const customerMap = new Map<number, Customer>();
+    customers.forEach((c) => customerMap.set(c.id, c));
+
+    const locationMap = new Map<number, Location>();
+    locations.forEach((l) => locationMap.set(l.id, l));
+
+    const variantMap = new Map<number, Variant>();
+    variants.forEach((v) => variantMap.set(v.id, v));
+
+    const productMap = new Map<number, Product>();
+    products.forEach((p) => productMap.set(p.id, p));
+
+    // 3. Hydrate display rows
+    return allOrders.map((order: SalesOrder): DisplaySalesOrderRow => {
+        const customer = customerMap.get(order.customerId);
+        const customerName = customer
+            ? `${customer.firstName} ${customer.lastName}`.trim()
+            : `客戶 #${order.customerId}`;
+
+        const location = locationMap.get(order.locationId);
+        const locationName = location?.name ?? `倉庫 #${order.locationId}`;
+
+        // Compute total quantity and price from line items
+        let totalQuantity = 0;
+        let totalPrice = 0;
+
+        const lineItemDescriptions = (order.salesOrderItems ?? []).map((item) => {
+            totalQuantity += item.quantity;
+            totalPrice += item.quantity * item.pricePerUnit;
+
+            const variant = variantMap.get(item.variantId);
+            const parentProduct = variant ? productMap.get(variant.productId) : undefined;
+            const productName = parentProduct?.name ?? `款式 #${item.variantId}`;
+
+            const configs = (variant?.configs ?? [])
+                .map((c) => c.value)
+                .filter(Boolean)
+                .join(" / ");
+
+            return {
+                variantId: item.variantId,
+                productName,
+                sku: variant?.sku ?? "",
+                specs: configs,
+                quantity: item.quantity,
+                pricePerUnit: item.pricePerUnit,
+            };
+        });
+
+        return {
+            id: order.id,
+            customerId: order.customerId,
+            customerName,
+            locationId: order.locationId,
+            locationName,
+            status: order.salesOrderStatus,
+            totalQuantity,
+            totalPrice,
+            createdAt: order.createdAt,
+            items: lineItemDescriptions,
+        };
+    });
+}
+
+export const Orders = () => {
+    const [orders, setOrders] = useState<DisplaySalesOrderRow[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [orderTarget, setOrderTarget] = useState<OrderTarget>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
-    const [locations, setLocations] = useState<KatanaLocation[]>([]);
 
     const editOrderRef = useRef<EditOrderHandle>(null);
 
-    // Fetch locations to resolve warehouse names in printouts
+    const refreshOrders = useCallback(async () => {
+        setIsLoading(true);
+        setErrorMessage(null);
+        try {
+            const data = await loadSalesOrdersCatalog();
+            setOrders(data);
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : "無法讀取訂單目錄。");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         let isMounted = true;
-        const fetchLocations = async () => {
-            const res = await katanaFetch<KatanaLocation[]>(KATANA_API_ROUTES.LOCATIONS);
-            if (isMounted && res.success && Array.isArray(res.data)) {
-                setLocations(res.data);
-            }
-        };
-        fetchLocations();
+
+        loadSalesOrdersCatalog()
+            .then((data) => {
+                if (isMounted) {
+                    setOrders(data);
+                    setIsLoading(false);
+                }
+            })
+            .catch((err) => {
+                if (isMounted) {
+                    setErrorMessage(err instanceof Error ? err.message : "無法讀取訂單目錄。");
+                    setIsLoading(false);
+                }
+            });
+
         return () => {
             isMounted = false;
         };
     }, []);
 
-    const ordersList = useMemo(() => {
-        return Array.from(orders.values());
-    }, [orders]);
-
-    // Filter across Order Number, Customer Info, and Order Row Items
-    const filteredItems = useMemo(() => {
+    // Filter across Order ID, Customer Name, Status, and nested item descriptions
+    const filteredOrders = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
-        if (!term) return ordersList;
+        if (!term) return orders;
 
-        return ordersList.filter((order) => {
-            const orderNoMatch = order.order_no?.toLowerCase().includes(term);
-            const customerName = getCustomerName(order.customer_id).toLowerCase();
-            const customerMatch = customerName.includes(term) || order.customer_id?.toString().includes(term);
-            const statusMatch = order.status?.toLowerCase().includes(term);
+        return orders.filter((order: DisplaySalesOrderRow) => {
+            const idMatch =
+                `so-${order.id}`.toLowerCase().includes(term) ||
+                String(order.id).includes(term);
+            const customerMatch = order.customerName.toLowerCase().includes(term);
+            const statusMatch = order.status.toLowerCase().includes(term);
+            const locationMatch = order.locationName.toLowerCase().includes(term);
 
-            const rowItemMatch = order.sales_order_rows?.some((row) => {
-                const details = getVariantDetails(row.variant_id);
-                return (
-                    details?.product_name.toLowerCase().includes(term) ||
-                    details?.sku.toLowerCase().includes(term) ||
-                    details?.variant_details?.toLowerCase().includes(term)
-                );
-            });
+            // Search through the hydrated variant details on each line item
+            const itemsMatch = order.items.some((item: DisplaySalesOrderItem) =>
+                item.productName.toLowerCase().includes(term) ||
+                item.sku.toLowerCase().includes(term) ||
+                item.specs.toLowerCase().includes(term)
+            );
 
-            return orderNoMatch || customerMatch || statusMatch || rowItemMatch;
+            return idMatch || customerMatch || statusMatch || locationMatch || itemsMatch;
         });
-    }, [ordersList, searchTerm, getCustomerName, getVariantDetails]);
-
-    const isGlobalLoading = loadingOrders || loadingProducts || loadingCustomers || loadingInventory;
-
-    const handleDelete = async () => {
-        if (!orderTarget || orderTarget.orderId === -1) return;
-
-        try {
-            await deleteOrder(orderTarget.orderId);
-            setOrderTarget(null);
-        } catch (err) {
-            console.error("Failed to delete order:", err);
-        }
+    }, [orders, searchTerm]);
+    const handleCloseModal = async () => {
+        if (isSaving) return;
+        setOrderTarget(null);
+        await refreshOrders();
     };
 
-    /**
-     * Resolves all IDs into human-readable strings before printing/exporting.
-     */
-    const handleExport = () => {
-        if (!orderTarget || orderTarget.orderId === -1) return;
+    const handleExport = async () => {
+        if (!orderTarget || orderTarget.orderId === UNSAVED_ORDER_ID) return;
 
-        const targetOrder = orders.get(orderTarget.orderId);
-        if (!targetOrder) return;
+        try {
+            const order = await getSalesOrderById(orderTarget.orderId);
+            const targetRow = orders.find((o) => o.id === orderTarget.orderId);
 
-        // Resolve location name
-        const locationName =
-            locations.find((l) => l.id === targetOrder.location_id)?.name ||
-            `倉庫 #${targetOrder.location_id}`;
+            if (!order || !targetRow) return;
 
-        // Enrich the sales order with customer name and variant resolver
-        const exportableOrder = {
-            ...targetOrder,
-            customer_name: getCustomerName(targetOrder.customer_id),
-        };
+            // Prepare printable DTO
+            // const exportData = {
+            //     ...order,
+            //     order_no: `SO-${order.id.toString().padStart(5, "0")}`,
+            //     customer_name: targetRow.customerName,
+            // };
 
-        // Call PDF print function passing the resolver function from useProductCatalog
-        printSalesOrderPDF(exportableOrder, locationName, getVariantDetails);
+            // printSalesOrderPDF(exportData, targetRow.locationName);
+        } catch (err) {
+            console.error("Failed to export sales order PDF:", err);
+        }
     };
 
     return (
         <PageLayout
             id="ordersPage"
-            title="訂單"
+            title="銷售訂單"
             actions={
                 <>
                     <Button
-                        onClick={() => setOrderTarget({ orderId: -1 })}
+                        onClick={() => setOrderTarget({ orderId: UNSAVED_ORDER_ID })}
                         className={PRIMARY_BUTTON}
                     >
                         <Plus width="14" height="14" />
                         新增訂單
                     </Button>
 
-                    <RefreshButton label="重新整理訂單" onClick={() => refetchOrders()} />
+                    <RefreshButton label="重新整理訂單" onClick={refreshOrders} />
 
                     <div className="w-full sm:w-80">
                         <input
@@ -150,8 +240,8 @@ export const Orders = () => {
                 </>
             }
         >
-            {isGlobalLoading ? (
-                <div className={PLACEHOLDER_PANEL}>準備畫面中</div>
+            {isLoading ? (
+                <div className={PLACEHOLDER_PANEL}>準備畫面中...</div>
             ) : errorMessage ? (
                 <div className={ERROR_PANEL}>
                     <p className="font-semibold">無法讀取訂單</p>
@@ -159,25 +249,20 @@ export const Orders = () => {
                 </div>
             ) : (
                 <OrdersTable
-                    items={filteredItems}
+                    items={filteredOrders}
                     onRowClick={(orderId) => setOrderTarget({ orderId })}
                 />
             )}
 
             <EditModal
-                showSaveButton={true}
-                title={orderTarget?.orderId !== -1 ? "編輯訂單" : "新增訂單"}
+                showSaveButton={orderTarget?.orderId === UNSAVED_ORDER_ID}
+                title={orderTarget?.orderId !== UNSAVED_ORDER_ID ? "訂單詳情" : "新增訂單"}
                 isOpen={orderTarget !== null}
-                onClose={() => setOrderTarget(null)}
+                onClose={handleCloseModal}
                 isSaving={isSaving}
                 onSave={() => editOrderRef.current?.submit()}
-                onDelete={
-                    orderTarget && orderTarget.orderId !== -1
-                        ? handleDelete
-                        : undefined
-                }
                 onExport={
-                    orderTarget && orderTarget.orderId !== -1
+                    orderTarget && orderTarget.orderId !== UNSAVED_ORDER_ID
                         ? handleExport
                         : undefined
                 }
@@ -187,7 +272,10 @@ export const Orders = () => {
                         onSavingChange={setIsSaving}
                         id={orderTarget.orderId}
                         ref={editOrderRef}
-                        onCreated={() => setOrderTarget(null)}
+                        onCreated={async () => {
+                            setOrderTarget(null);
+                            await refreshOrders();
+                        }}
                     />
                 )}
             </EditModal>

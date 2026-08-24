@@ -1,8 +1,10 @@
 export type ProductConfig = {
-    id: number
+    // id: number
     name: string
-    value: string[]
+    values: string[]
 }
+
+export type ProductConfigDraft = Omit<ProductConfig, "id">;
 
 export type Product = {
     id: number

@@ -1,70 +1,115 @@
 // src/pages/Customers.tsx
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { PageLayout } from "../components/PageLayout";
 import { CustomersTable } from "@/components/customers/CustomersTable";
-import { useError } from "../hooks/useError";
 import {
     CONTROL_INPUT,
     ERROR_PANEL,
     PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
 } from "../lib/styles";
-import { useCustomersCatalog } from "@/hooks/useContexts";
 import { EditModal } from "@/components/EditModal";
 import { EditCustomer, type EditCustomerHandle } from "@/components/customers/EditCustomer";
-import type { KatanaCustomer } from "@/models/katana/customers";
+import type { Customer } from "@my-inventory-app/shared";
+import { getCustomers, deleteCustomerById } from "@/services/customerService";
 import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/RefreshButton";
 
-/** null = closed, -1 = new customer creation, number = editing customer id */
+const UNSAVED_CUSTOMER_ID = -1;
+
 type CustomerTarget = { customerId: number } | null;
 
 export const Customers = () => {
-    const { customers, loading, refetchCustomers, deleteCustomer } = useCustomersCatalog();
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    const { errorMessage } = useError();
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [customerTarget, setCustomerTarget] = useState<CustomerTarget>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
     const editCustomerRef = useRef<EditCustomerHandle>(null);
 
-    const customersList = useMemo(() => {
-        return Array.from(customers.values());
-    }, [customers]);
+    const refreshCustomers = useCallback(async () => {
+        setIsLoading(true);
+        setErrorMessage(null);
+        try {
+            const data = await getCustomers();
+            setCustomers(data);
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : "無法載入客戶清單。");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-    const handleDeleteCustomer = () => {
-        const customerId = customerTarget?.customerId
-        if (!customerId) return
+    useEffect(() => {
+        let isMounted = true;
 
-        deleteCustomer(customerId)
+        getCustomers()
+            .then((data) => {
+                if (isMounted) {
+                    setCustomers(data);
+                    setIsLoading(false);
+                }
+            })
+            .catch((err) => {
+                if (isMounted) {
+                    setErrorMessage(err instanceof Error ? err.message : "無法載入客戶清單。");
+                    setIsLoading(false);
+                }
+            });
 
-        setCustomerTarget(null)
-    }
-    // Filter across Name, Company, Email, Phone, and Comment
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const handleDeleteCustomer = async () => {
+        const customerId = customerTarget?.customerId;
+        if (!customerId || customerId === UNSAVED_CUSTOMER_ID) return;
+
+        try {
+            await deleteCustomerById(customerId);
+            setCustomerTarget(null);
+            await refreshCustomers();
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : "刪除客戶失敗。");
+        }
+    };
+
+    const handleCloseModal = async () => {
+        if (isSaving) return;
+        setCustomerTarget(null);
+        await refreshCustomers();
+    };
+
+    // Filter across Name, Company, Email, Phone, and City
     const filteredItems = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
-        if (!term) return customersList;
+        if (!term) return customers;
 
-        return customersList.filter((customer) => {
-            const nameMatch = customer.name?.toLowerCase().includes(term);
-            const firstNameMatch = customer.first_name?.toLowerCase().includes(term);
-            const lastNameMatch = customer.last_name?.toLowerCase().includes(term);
+        return customers.filter((customer) => {
+            const fullName = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.toLowerCase();
+            const firstNameMatch = customer.firstName?.toLowerCase().includes(term);
+            const lastNameMatch = customer.lastName?.toLowerCase().includes(term);
             const companyMatch = customer.company?.toLowerCase().includes(term);
             const emailMatch = customer.email?.toLowerCase().includes(term);
-            const phoneMatch = customer.phone?.toLowerCase().includes(term);
+            const phoneMatch = customer.phoneNumber?.toLowerCase().includes(term);
+            const cityMatch = customer.city?.toLowerCase().includes(term);
 
             return (
-                nameMatch ||
+                fullName.includes(term) ||
                 firstNameMatch ||
                 lastNameMatch ||
-                companyMatch ||
-                emailMatch ||
-                phoneMatch
+                Boolean(companyMatch) ||
+                Boolean(emailMatch) ||
+                Boolean(phoneMatch) ||
+                Boolean(cityMatch)
             );
         });
-    }, [customersList, searchTerm]);
+    }, [customers, searchTerm]);
 
     return (
         <PageLayout
@@ -73,14 +118,14 @@ export const Customers = () => {
             actions={
                 <>
                     <Button
-                        onClick={() => setCustomerTarget({ customerId: -1 })}
+                        onClick={() => setCustomerTarget({ customerId: UNSAVED_CUSTOMER_ID })}
                         className={PRIMARY_BUTTON}
                     >
                         <Plus width="14" height="14" />
                         新增客戶
                     </Button>
 
-                    <RefreshButton label="重新整理客戶" onClick={() => refetchCustomers()} />
+                    <RefreshButton label="重新整理客戶" onClick={refreshCustomers} />
 
                     <div className="w-full sm:w-80">
                         <input
@@ -94,8 +139,8 @@ export const Customers = () => {
                 </>
             }
         >
-            {loading ? (
-                <div className={PLACEHOLDER_PANEL}>準備畫面中</div>
+            {isLoading ? (
+                <div className={PLACEHOLDER_PANEL}>準備畫面中...</div>
             ) : errorMessage ? (
                 <div className={ERROR_PANEL}>
                     <p className="font-semibold">無法讀取客戶資料</p>
@@ -104,28 +149,35 @@ export const Customers = () => {
             ) : (
                 <CustomersTable
                     items={filteredItems}
-                    onRowClick={(customerId: KatanaCustomer["id"]) => setCustomerTarget({ customerId })}
+                    onRowClick={(customerId) => setCustomerTarget({ customerId })}
                 />
             )}
 
             <EditModal
                 showSaveButton={true}
-                title={customerTarget?.customerId !== -1 ? "編輯客戶" : "新增客戶"}
+                title={customerTarget?.customerId !== UNSAVED_CUSTOMER_ID ? "編輯客戶" : "新增客戶"}
                 isOpen={customerTarget !== null}
-                onClose={() => setCustomerTarget(null)}
+                onClose={handleCloseModal}
                 isSaving={isSaving}
                 onSave={() => editCustomerRef.current?.submit()}
-                onDelete={handleDeleteCustomer}
+                onDelete={
+                    customerTarget && customerTarget.customerId !== UNSAVED_CUSTOMER_ID
+                        ? handleDeleteCustomer
+                        : undefined
+                }
             >
                 {customerTarget && (
                     <EditCustomer
                         onSavingChange={setIsSaving}
                         id={customerTarget.customerId}
                         ref={editCustomerRef}
-                        onSuccess={() => setCustomerTarget(null)}
+                        onSuccess={async () => {
+                            setCustomerTarget(null);
+                            await refreshCustomers();
+                        }}
                     />
                 )}
             </EditModal>
-        </PageLayout >
+        </PageLayout>
     );
 };

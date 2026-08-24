@@ -20,12 +20,12 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { ErrorProvider } from "./context/error/ErrorProvider";
 import { AuthProvider } from "./context/auth/AuthProvider";
-import { CustomersProvider } from "./context/customers/CustomersProvider";
-import { ManufactureProvider } from "./context/manufacture/ManufactureProvider";
-import { InventoryProvider } from "./context/inventory/InventoryProvider";
-import { ProductProvider } from "./context/product/ProductProvider";
-import { VariantProvider } from "./context/variant/VariantProvider";
-import { OrdersProvider } from "./context/orders/OrdersProvider";
+// import { CustomersProvider } from "./context/customers/CustomersProvider";
+// import { ManufactureProvider } from "./context/manufacture/ManufactureProvider";
+// import { InventoryProvider } from "./context/inventory/InventoryProvider";
+// // import { ProductProvider } from "./context/product/ProductProvider";
+// import { VariantProvider } from "./context/variant/VariantProvider";
+// import { OrdersProvider } from "./context/orders/OrdersProvider";
 
 // Composer
 import { ProviderComposer } from "./components/ProviderComposer";
@@ -35,12 +35,12 @@ const appProviders: Array<ComponentType<{ children: ReactNode }>> = [
   TooltipProvider,
   ErrorProvider,
   AuthProvider,
-  CustomersProvider,
-  ManufactureProvider,
-  InventoryProvider,
-  ProductProvider,
-  VariantProvider,
-  OrdersProvider,
+  // CustomersProvider,
+  // ManufactureProvider,
+  // InventoryProvider,
+  // ProductProvider,
+  // VariantProvider,
+  // OrdersProvider,
 ];
 
 export default function App() {

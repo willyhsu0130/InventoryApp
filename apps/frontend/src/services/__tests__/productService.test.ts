@@ -84,7 +84,7 @@ describe("Product Service", () => {
 
         it("POST: automatically creates initial variants when product is created with configs", async () => {
             const configs: ProductConfig[] = [
-                { id: 1, name: "Grind Size", value: ["Fine", "Coarse"] },
+                { name: "Grind Size", values: ["Fine", "Coarse"] },
             ];
 
             const product = await createProduct({
@@ -129,8 +129,8 @@ describe("Product Service", () => {
 
         it("POST: creates a product with initial configs", async () => {
             const configs: ProductConfig[] = [
-                { id: 1, name: "Grind Size", value: ["Fine", "Medium", "Coarse"] },
-                { id: 2, name: "Roast Level", value: ["Light", "Dark"] },
+                { name: "Grind Size", values: ["Fine", "Medium", "Coarse"] },
+                { name: "Roast Level", values: ["Light", "Dark"] },
             ];
 
             const product = await createProduct({
@@ -159,7 +159,7 @@ describe("Product Service", () => {
 
         it("PATCH: updates configs array", async () => {
             const newConfigs: ProductConfig[] = [
-                { id: 1, name: "Flavor Notes", value: ["Fruity", "Nutty"] },
+                { name: "Flavor Notes", values: ["Fruity", "Nutty"] },
             ];
 
             const updated = await updateProduct(sharedProductId, {
@@ -201,7 +201,6 @@ describe("Product Service", () => {
         // let cascadeProductId: number;
         // let childVariantId: number;
 
-
         it("DELETE: soft-deletes the product (is_archived = true)", async () => {
             const archivedProduct = await deleteProduct(sharedProductId);
             expect(archivedProduct.isArchived).toBe(true);
@@ -219,6 +218,42 @@ describe("Product Service", () => {
             expect(product.id).toBe(sharedProductId);
             expect(product.isArchived).toBe(true);
         });
+    });
+
+    it("DELETE: cascades is_archived = true to ALL auto-generated and existing child variants", async () => {
+        // 1. Create product with multiple config permutations (creates 4 variants)
+        const product = await createProduct({
+            name: `Multi-Variant Cascade Target ${Date.now()}`,
+            uom: "pcs",
+            batchTracked: false,
+            configs: [
+                { name: "Size", values: ["S", "M"] },
+                { name: "Color", values: ["Red", "Blue"] },
+            ],
+        });
+        createdProductIds.push(product.id);
+
+        // 2. Verify all 4 variants are active initially
+        const { data: initialVariants } = await supabase
+            .from("variants")
+            .select("id, is_archived")
+            .eq("product_id", product.id);
+
+        expect(initialVariants?.length).toBe(4);
+        expect(initialVariants?.every((v) => v.is_archived === false)).toBe(true);
+
+        // 3. Soft-delete the parent product
+        const archivedProduct = await deleteProduct(product.id);
+        expect(archivedProduct.isArchived).toBe(true);
+
+        // 4. Verify EVERY child variant under this product is now soft-deleted
+        const { data: updatedVariants } = await supabase
+            .from("variants")
+            .select("id, is_archived")
+            .eq("product_id", product.id);
+
+        expect(updatedVariants?.length).toBe(4);
+        expect(updatedVariants?.every((v) => v.is_archived === true)).toBe(true);
     });
 
     // ==========================================
@@ -303,6 +338,66 @@ describe("Product Service", () => {
             expect(updatedVariant?.is_archived).toBe(true);
         });
 
+    });
+
+    // ==========================================
+    // 1. EXACT AUTO-GENERATION COUNT CHECKS
+    // ==========================================
+    describe("Variant Auto-Generation Rules", () => {
+        it("POST: creates EXACTLY ONE default variant when product has NO configs", async () => {
+            const payload: Omit<Product, "id" | "isArchived"> = {
+                name: `Single Default Variant Item ${Date.now()}`,
+                uom: "pcs",
+                batchTracked: false,
+                configs: [],
+            };
+
+            const product = await createProduct(payload);
+            createdProductIds.push(product.id);
+
+            const { data: variants, error } = await supabase
+                .from("variants")
+                .select("*")
+                .eq("product_id", product.id);
+
+            if (error) throw error;
+
+            // Strictly assert EXACTLY 1 variant exists
+            expect(variants).toBeDefined();
+            expect(variants?.length).toBe(1);
+
+            const defaultVariant = variants![0];
+            expect(defaultVariant.product_id).toBe(product.id);
+            expect(defaultVariant.is_archived).toBe(false);
+            expect(defaultVariant.configs).toEqual([]);
+        });
+
+        it("POST: creates EXACTLY matching variants corresponding to config permutations", async () => {
+            // 2 grind sizes * 2 roast levels = 4 total variants
+            const configs: ProductConfig[] = [
+                { name: "Grind Size", values: ["Fine", "Coarse"] },
+                { name: "Roast Level", values: ["Light", "Dark"] },
+            ];
+
+            const product = await createProduct({
+                name: `Permuted Variant Item ${Date.now()}`,
+                uom: "bags",
+                batchTracked: true,
+                configs,
+            });
+            createdProductIds.push(product.id);
+
+            const { data: variants, error } = await supabase
+                .from("variants")
+                .select("*")
+                .eq("product_id", product.id);
+
+            if (error) throw error;
+
+            // Strictly assert EXACTLY 4 variants (2 * 2) are created
+            expect(variants).toBeDefined();
+            expect(variants?.length).toBe(4);
+        });
     });
 })
 

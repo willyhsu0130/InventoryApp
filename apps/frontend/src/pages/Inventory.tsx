@@ -1,14 +1,11 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { InventoryTable } from "../components/inventory/InventoryTable";
 import { PageLayout } from "../components/PageLayout";
-import { useError } from "../hooks/useError";
-import {
-    useInventoryCatalog,
-    useProductCatalog,
-    useVariant,
-} from "../hooks/useContexts";
-import type { KatanaInventoryItem } from "@my-inventory-app/shared";
+import type { Product, Variant } from "@my-inventory-app/shared";
+import { getActiveProducts } from "@/services/productService";
+import { getActiveVariants } from "@/services/variantService";
+import { getTotalStockByVariantId } from "@/services/inventoryLevelService";
 import {
     CONTROL_INPUT,
     ERROR_PANEL,
@@ -16,60 +13,140 @@ import {
     PRIMARY_BUTTON,
 } from "../lib/styles";
 import { EditModal } from "@/components/EditModal";
-import { StockAdjustment, type StockAdjustmentHandle } from "@/components/inventory/StockAdjustment";
+import { InventoryMovement, type InventoryMovementHandle } from "@/components/inventory/InventoryMovement";
 import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/RefreshButton";
 import { InventorySectionNav } from "@/components/inventory/InventorySectionNav";
 
-/** null = closed, undefined variant = blank adjustment, number = prefilled row. */
+export interface DisplayInventoryRow {
+    variantId: number;
+    productId: number;
+    productName: string;
+    displayName: string;
+    sku: string;
+    uom: string;
+    inStock: number;
+    configValues: string[];
+}
+
 type AdjustmentTarget = { variantId: number | null } | null;
 
-export const Inventory = () => {
-    // 1. Consume inventory catalog and product context
-    const { inventoryItems, loading: inventoryLoading, refetchInventory } = useInventoryCatalog();
-    const { products, loading: productsLoading } = useProductCatalog();
-    const { variants, loading: variantsLoading } = useVariant();
+async function loadInventoryCatalog(): Promise<DisplayInventoryRow[]> {
+    // 1. Fetch active variants and active products in parallel
+    const [variants, products] = await Promise.all([
+        getActiveVariants(),
+        getActiveProducts(),
+    ]);
 
-    const { errorMessage } = useError();
+    // 2. Map products for O(1) attribute resolution
+    const productMap = new Map<number, Product>();
+    products.forEach((p) => productMap.set(p.id, p));
+
+    // 3. Hydrate live on-hand stock quantities for all variants in parallel
+    return Promise.all(
+        variants.map(async (variant: Variant): Promise<DisplayInventoryRow> => {
+            const parentProduct = productMap.get(variant.productId);
+            const parentName = parentProduct?.name ?? "未命名產品";
+            const uom = parentProduct?.uom ?? "pcs";
+
+            const configValues: string[] = (variant.configs ?? [])
+                .map((c) => c.value)
+                .filter((val): boolean => Boolean(val?.trim()));
+
+            const displayName =
+                configValues.length > 0
+                    ? `${parentName} - ${configValues.join(" / ")}`
+                    : parentName;
+
+            const inStock = await getTotalStockByVariantId(variant.id).catch(() => 0);
+
+            return {
+                variantId: variant.id,
+                productId: variant.productId,
+                productName: parentName,
+                displayName,
+                sku: variant.sku ?? "",
+                uom,
+                inStock,
+                configValues,
+            };
+        })
+    );
+}
+
+export const Inventory = () => {
+    const [items, setItems] = useState<DisplayInventoryRow[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
     const [searchTerm, setSearchTerm] = useState<string>("");
     const [adjustmentTarget, setAdjustmentTarget] = useState<AdjustmentTarget>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
-    const stockAdjustmentRef = useRef<StockAdjustmentHandle>(null);
+    const stockAdjustmentRef = useRef<InventoryMovementHandle>(null);
 
-    // 2. Explicitly type inventoryList
-    const inventoryList = useMemo<KatanaInventoryItem[]>(() => {
-        return Array.from(inventoryItems.values());
-    }, [inventoryItems]);
-
-    // 3. Filter across Variant ID, Product Name, SKU, and Variant Details
-    const filteredItems = useMemo<KatanaInventoryItem[]>(() => {
-        const term = searchTerm.toLowerCase().trim();
-        if (!term) return inventoryList;
-
-        return inventoryList.filter((item: KatanaInventoryItem) => {
-            const variant = variants.get(item.variant_id);
-            const product = variant ? products.get(variant.product_id) : undefined;
-
-            const productNameMatch = product?.name.toLowerCase().includes(term);
-            const skuMatch = variant?.sku?.toLowerCase().includes(term);
-            const variantDetailsMatch = variant?.config_attributes?.some(
-                (attr) => attr.config_value?.toLowerCase().includes(term)
+    // Catalog Refresh Handler
+    const refreshInventory = useCallback(async () => {
+        setIsLoading(true);
+        setErrorMessage(null);
+        try {
+            const data = await loadInventoryCatalog();
+            setItems(data);
+        } catch (err) {
+            setErrorMessage(
+                err instanceof Error ? err.message : "無法載入庫存資訊。"
             );
-            const variantIdMatch = item.variant_id.toString().includes(term);
-            const locationIdMatch = item.location_id.toString().includes(term);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
-            return Boolean(
-                productNameMatch ||
-                variantDetailsMatch ||
-                skuMatch ||
-                variantIdMatch ||
-                locationIdMatch
+    // Initial Mount Fetching
+    useEffect(() => {
+        let isMounted = true;
+
+        loadInventoryCatalog()
+            .then((data) => {
+                if (isMounted) {
+                    setItems(data);
+                    setIsLoading(false);
+                }
+            })
+            .catch((err) => {
+                if (isMounted) {
+                    setErrorMessage(
+                        err instanceof Error ? err.message : "無法載入庫存資訊。"
+                    );
+                    setIsLoading(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    // Search filter across Product Name, SKU, Display Name, and Variant ID
+    const filteredItems = useMemo(() => {
+        const term = searchTerm.toLowerCase().trim();
+        if (!term) return items;
+
+        return items.filter((item) => {
+            return (
+                item.displayName.toLowerCase().includes(term) ||
+                item.productName.toLowerCase().includes(term) ||
+                item.sku.toLowerCase().includes(term) ||
+                item.variantId.toString().includes(term) ||
+                item.configValues.some((val) => val.toLowerCase().includes(term))
             );
         });
-    }, [inventoryList, searchTerm, products, variants]);
+    }, [items, searchTerm]);
 
-    const isGlobalLoading = inventoryLoading || productsLoading || variantsLoading;
+    const handleCloseAdjustmentModal = async () => {
+        if (isSaving) return;
+        setAdjustmentTarget(null);
+        await refreshInventory();
+    };
 
     return (
         <PageLayout
@@ -86,7 +163,7 @@ export const Inventory = () => {
                         調整庫存
                     </Button>
 
-                    <RefreshButton label="重新整理庫存" onClick={() => refetchInventory()} />
+                    <RefreshButton label="重新整理庫存" onClick={refreshInventory} />
 
                     <div className="w-full sm:w-80">
                         <input
@@ -100,15 +177,14 @@ export const Inventory = () => {
                 </>
             }
         >
-            {isGlobalLoading ? (
-                <div className={PLACEHOLDER_PANEL}>準備畫面中</div>
+            {isLoading ? (
+                <div className={PLACEHOLDER_PANEL}>準備畫面中...</div>
             ) : errorMessage ? (
                 <div className={ERROR_PANEL}>
                     <p className="font-semibold">無法讀取庫存</p>
                     <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
                 </div>
             ) : (
-                /* Inventory Table */
                 <InventoryTable
                     items={filteredItems}
                     onRowClick={(variantId) => setAdjustmentTarget({ variantId })}
@@ -119,16 +195,17 @@ export const Inventory = () => {
                 showSaveButton={true}
                 title="調整庫存"
                 isOpen={adjustmentTarget !== null}
-                onClose={() => setAdjustmentTarget(null)}
+                onClose={handleCloseAdjustmentModal}
                 isSaving={isSaving}
                 onSave={() => stockAdjustmentRef.current?.submit()}
             >
-                <StockAdjustment
+                <InventoryMovement
                     onSavingChange={setIsSaving}
-                    items={inventoryList}
+                    items={items}
                     ref={stockAdjustmentRef}
                     onSuccess={async () => {
                         setAdjustmentTarget(null);
+                        await refreshInventory();
                     }}
                     initialVariantId={adjustmentTarget?.variantId}
                 />

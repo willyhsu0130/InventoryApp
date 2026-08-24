@@ -1,110 +1,191 @@
 // src/pages/InventoryBatches.tsx
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PageLayout } from "@/components/PageLayout";
-import { CONTROL_INPUT, PLACEHOLDER_PANEL } from "@/lib/styles";
-import {
-    useInventoryCatalog,
-    useProductCatalog,
-    useVariant,
-} from "@/hooks/useContexts";
-import type { KatanaBatch } from "@my-inventory-app/shared";
+import { CONTROL_INPUT, ERROR_PANEL, PLACEHOLDER_PANEL } from "@/lib/styles";
+import type { Batch, Product } from "@my-inventory-app/shared";
+import { getBatchesByVariantId } from "@/services/batchService";
+import { getActiveProducts } from "@/services/productService";
+import { getActiveVariants } from "@/services/variantService";
 import { InventorySectionNav } from "@/components/inventory/InventorySectionNav";
 import { formatQuantity } from "@/lib/formatQuantity";
 import { RefreshButton } from "@/components/RefreshButton";
 
-export const InventoryBatches = () => {
-    const { batches, loading: inventoryLoading, refetchInventory } = useInventoryCatalog();
-    const { products, loading: productsLoading } = useProductCatalog();
-    const { variants, loading: variantsLoading } = useVariant();
+export interface DisplayBatchRow {
+    id: number;
+    batchNumber: string;
+    variantId: number;
+    productId: number;
+    productName: string;
+    displayName: string;
+    sku: string;
+    uom: string;
+    quantity: number;
+    createdAt: string;
+    expiredAt: string;
+}
 
-    const [searchTerm, setSearchTerm] = useState("");
+async function loadBatchCatalog(): Promise<DisplayBatchRow[]> {
+    // 1. Fetch active variants and products
+    const [variants, products] = await Promise.all([
+        getActiveVariants(),
+        getActiveProducts(),
+    ]);
 
-    const getVariantDetails = useCallback(
-        (variantId: number) => {
-            const variant = variants.get(variantId);
-            const product = variant ? products.get(variant.product_id) : undefined;
-            const detailsString = variant?.config_attributes
-                ?.map((attr) => attr.config_value)
-                .filter(Boolean)
-                .join(" / ");
+    const productMap = new Map<number, Product>();
+    products.forEach((p) => productMap.set(p.id, p));
 
-            return {
-                product_name: product?.name ?? `Variant #${variantId}`,
-                variant_details: detailsString || undefined,
-                sku: variant?.sku || "N/A",
-                uom: product?.uom || "",
-            };
-        },
-        [products, variants]
+    // 2. Fetch batches for each variant using existing getBatchesByVariantId
+    const batchArrays = await Promise.all(
+        variants.map((v) => getBatchesByVariantId(v.id).catch(() => []))
     );
 
-    const batchList = useMemo<KatanaBatch[]>(() => {
-        return Array.from(batches.values());
-    }, [batches]);
+    // 3. Flatten and attach metadata
+    return variants.flatMap((variant, index): DisplayBatchRow[] => {
+        const variantBatches = batchArrays[index] ?? [];
+        const parentProduct = productMap.get(variant.productId);
+        const parentName = parentProduct?.name ?? `款式 #${variant.id}`;
+        const uom = parentProduct?.uom ?? "pcs";
 
-    const filteredBatches = useMemo<KatanaBatch[]>(() => {
+        const configValues = (variant.configs ?? [])
+            .map((c) => c.value)
+            .filter((val): boolean => Boolean(val?.trim()));
+
+        const displayName =
+            configValues.length > 0
+                ? `${parentName} - ${configValues.join(" / ")}`
+                : parentName;
+
+        return variantBatches.map((batch: Batch): DisplayBatchRow => ({
+            id: batch.id,
+            batchNumber: batch.batchNumber,
+            variantId: batch.variantId,
+            productId: variant.productId,
+            productName: parentName,
+            displayName,
+            sku: variant.sku ?? "",
+            uom,
+            quantity: batch.quantity,
+            createdAt: batch.createdAt,
+            expiredAt: batch.expiredAt,
+        }));
+    });
+}
+
+export const InventoryBatches = () => {
+    const [batches, setBatches] = useState<DisplayBatchRow[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState<string>("");
+
+    const refreshBatches = useCallback(async () => {
+        setIsLoading(true);
+        setErrorMessage(null);
+        try {
+            const data = await loadBatchCatalog();
+            setBatches(data);
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : "無法載入批次資料。");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        loadBatchCatalog()
+            .then((data) => {
+                if (isMounted) {
+                    setBatches(data);
+                    setIsLoading(false);
+                }
+            })
+            .catch((err) => {
+                if (isMounted) {
+                    setErrorMessage(err instanceof Error ? err.message : "無法載入批次資料。");
+                    setIsLoading(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const filteredBatches = useMemo(() => {
         const term = searchTerm.trim().toLowerCase();
-        if (!term) return batchList;
+        if (!term) return batches;
 
-        return batchList.filter((item) => {
-            const details = getVariantDetails(item.variant_id);
+        return batches.filter((item) => {
             return [
-                item.batch_number,
-                item.batch_barcode ?? "",
-                details.product_name,
-                details.variant_details ?? "",
-                String(item.variant_id),
+                item.batchNumber,
+                item.displayName,
+                item.productName,
+                item.sku,
+                String(item.variantId),
             ].some((value) => value.toLowerCase().includes(term));
         });
-    }, [batchList, getVariantDetails, searchTerm]);
+    }, [batches, searchTerm]);
 
-    const columns: Column<KatanaBatch>[] = [
+    const columns: Column<DisplayBatchRow>[] = [
         {
             header: "批次號碼",
-            render: (item) => <span className="font-medium">{item.batch_number}</span>,
+            render: (item) => (
+                <span className="font-mono font-medium text-foreground">
+                    {item.batchNumber}
+                </span>
+            ),
         },
         {
-            header: "產品 / 變體",
-            render: (item) => {
-                const details = getVariantDetails(item.variant_id);
-                return details.variant_details
-                    ? `${details.product_name} - ${details.variant_details}`
-                    : details.product_name;
-            },
+            header: "產品 / 款式",
+            render: (item) => (
+                <div className="font-sans">
+                    <span className="font-medium text-foreground">{item.displayName}</span>
+                    {item.sku && (
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">
+                            SKU: {item.sku}
+                        </div>
+                    )}
+                </div>
+            ),
         },
         {
-            header: "庫存數量",
+            header: "現有庫存",
             align: "right",
+            render: (item) => (
+                <span className="font-mono font-bold text-foreground">
+                    {formatQuantity(item.quantity)}{" "}
+                    <span className="text-muted-foreground font-normal text-[10px]">
+                        {item.uom}
+                    </span>
+                </span>
+            ),
+        },
+        {
+            header: "建立日期",
+            render: (item) => (
+                <span className="font-mono text-xs text-muted-foreground">
+                    {item.createdAt ? item.createdAt.slice(0, 10) : "—"}
+                </span>
+            ),
+        },
+        {
+            header: "有效期限",
             render: (item) => {
-                const details = getVariantDetails(item.variant_id);
+                const isExpired = new Date(item.expiredAt).getTime() <= Date.now();
                 return (
-                    <span>
-                        {formatQuantity(item.quantity_in_stock)}{" "}
-                        {details.uom && (
-                            <span className="text-muted-foreground font-normal text-[10px]">
-                                {details.uom}
-                            </span>
-                        )}
+                    <span
+                        className={`font-mono text-xs ${isExpired ? "text-destructive font-semibold" : "text-muted-foreground"
+                            }`}
+                    >
+                        {item.expiredAt ? item.expiredAt.slice(0, 10) : "—"}
+                        {isExpired && " (已過期)"}
                     </span>
                 );
             },
         },
-        {
-            header: "建立日期",
-            render: (item) => item.batch_created_date?.slice(0, 10) ?? "-",
-        },
-        {
-            header: "有效期限",
-            render: (item) => item.expiration_date?.slice(0, 10) ?? "-",
-        },
-        {
-            header: "條碼",
-            render: (item) => item.batch_barcode ?? "-",
-        },
     ];
-
-    const isGlobalLoading = inventoryLoading || productsLoading || variantsLoading;
 
     return (
         <PageLayout
@@ -113,20 +194,25 @@ export const InventoryBatches = () => {
             subnav={<InventorySectionNav />}
             actions={
                 <>
-                    <RefreshButton label="重新整理批次" onClick={() => refetchInventory()} />
+                    <RefreshButton label="重新整理批次" onClick={refreshBatches} />
                     <div className="w-full sm:w-80">
                         <input
                             value={searchTerm}
                             onChange={(event) => setSearchTerm(event.target.value)}
-                            placeholder="搜尋批次、產品或條碼..."
-                            className={`${CONTROL_INPUT} w-full sm:w-80`}
+                            placeholder="搜尋批次、產品或 SKU..."
+                            className={CONTROL_INPUT}
                         />
                     </div>
                 </>
             }
         >
-            {isGlobalLoading ? (
-                <div className={PLACEHOLDER_PANEL}>載入批次中</div>
+            {isLoading ? (
+                <div className={PLACEHOLDER_PANEL}>載入批次中...</div>
+            ) : errorMessage ? (
+                <div className={ERROR_PANEL}>
+                    <p className="font-semibold">無法讀取批次</p>
+                    <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
+                </div>
             ) : (
                 <DataTable
                     data={filteredBatches}

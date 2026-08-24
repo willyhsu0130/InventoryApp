@@ -1,261 +1,114 @@
 // src/pages/__tests__/InventoryBatches.test.tsx
-import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { InventoryBatches } from "../InventoryBatches";
-import {
-    useInventoryCatalog,
-    useProductCatalog,
-    useVariant,
-} from "@/hooks/useContexts";
-import type { KatanaBatch, KatanaProduct, ProductVariant } from "@my-inventory-app/shared";
+import * as batchService from "@/services/batchService";
+import * as productService from "@/services/productService";
+import * as variantService from "@/services/variantService";
+import type { Batch, Product, Variant } from "@my-inventory-app/shared";
 
-vi.mock("@/hooks/useContexts", () => ({
-    useInventoryCatalog: vi.fn(),
-    useProductCatalog: vi.fn(),
-    useVariant: vi.fn(),
+vi.mock("@/services/batchService", () => ({
+    getBatchesByVariantId: vi.fn(),
 }));
 
-const mockUseInventoryCatalog = vi.mocked(useInventoryCatalog);
-const mockUseProductCatalog = vi.mocked(useProductCatalog);
-const mockUseVariant = vi.mocked(useVariant);
+vi.mock("@/services/productService", () => ({
+    getActiveProducts: vi.fn(),
+}));
 
-const mockProducts: KatanaProduct[] = [
-    {
-        id: 1,
-        name: "金目鱸魚",
-        type: "product",
-        category_name: "Seafood",
-        uom: "kg",
-        batch_tracked: true,
-        serial_tracked: false,
-        is_sellable: true,
-        is_purchasable: true,
-        is_producible: false,
-        is_auto_assembly: false,
-        is_archived: false,
-        operations_in_sequence: false,
-        purchase_uom: null,
-        purchase_uom_conversion_rate: null,
-        default_supplier_id: null,
-        additional_info: null,
-        custom_field_collection_id: null,
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-        archived_at: null,
-        deleted_at: null,
-        configs: [],
-    },
-    {
-        id: 2,
-        name: "Arabica Coffee",
-        type: "product",
-        category_name: "Coffee",
-        uom: "bags",
-        batch_tracked: true,
-        serial_tracked: false,
-        is_sellable: true,
-        is_purchasable: true,
-        is_producible: false,
-        is_auto_assembly: false,
-        is_archived: false,
-        operations_in_sequence: false,
-        purchase_uom: null,
-        purchase_uom_conversion_rate: null,
-        default_supplier_id: null,
-        additional_info: null,
-        custom_field_collection_id: null,
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-        archived_at: null,
-        deleted_at: null,
-        configs: [],
-    },
-];
-
-const mockVariants: ProductVariant[] = [
-    {
-        id: 101,
-        product_id: 1,
-        type: "product",
-        sku: "FSH-001",
-        sales_price: 150,
-        purchase_price: 80,
-        config_attributes: [{ config_name: "Color", config_value: "red" }],
-        supplier_item_codes: [],
-        custom_fields: [],
-        internal_barcode: null,
-        registered_barcode: null,
-        material_id: null,
-        lead_time: null,
-        minimum_order_quantity: null,
-        abc_classification: null,
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-    },
-    {
-        id: 102,
-        product_id: 2,
-        type: "product",
-        sku: "COF-001",
-        sales_price: 20,
-        purchase_price: 10,
-        config_attributes: [{ config_name: "Roast", config_value: "Medium Roast" }],
-        supplier_item_codes: [],
-        custom_fields: [],
-        internal_barcode: null,
-        registered_barcode: null,
-        material_id: null,
-        lead_time: null,
-        minimum_order_quantity: null,
-        abc_classification: null,
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-    },
-];
-
-const mockBatches: KatanaBatch[] = [
-    {
-        id: 1,
-        variant_id: 101,
-        batch_number: "BATCH-2026-001",
-        batch_barcode: "BAR-001",
-        batch_created_date: "2026-05-10T00:00:00Z",
-        expiration_date: "2028-05-09T00:00:00Z",
-        quantity_in_stock: 45,
-        created_at: "2026-05-10T00:00:00Z",
-        updated_at: "2026-05-10T00:00:00Z",
-    },
-    {
-        id: 2,
-        variant_id: 102,
-        batch_number: "BATCH-2026-002",
-        batch_barcode: "BAR-002",
-        batch_created_date: "2026-06-15T00:00:00Z",
-        expiration_date: "2028-06-14T00:00:00Z",
-        quantity_in_stock: 80,
-        created_at: "2026-06-15T00:00:00Z",
-        updated_at: "2026-06-15T00:00:00Z",
-    },
-];
+vi.mock("@/services/variantService", () => ({
+    getActiveVariants: vi.fn(),
+}));
 
 describe("<InventoryBatches /> Page", () => {
-    const mockRefetchInventory = vi.fn();
+    const mockProducts: Product[] = [
+        {
+            id: 1,
+            name: "冷凍鮭魚",
+            uom: "kg",
+            batchTracked: true,
+            configs: [],
+            isArchived: false,
+        },
+    ];
+
+    const mockVariants: Variant[] = [
+        {
+            id: 201,
+            productId: 1,
+            sku: "SALMON-01",
+            salesPrice: 400,
+            configs: [],
+            isArchived: false,
+        },
+    ];
+
+    const mockBatches: Batch[] = [
+        {
+            id: 1,
+            variantId: 201,
+            batchNumber: "LOT-2026-001",
+            quantity: 120,
+            createdAt: "2026-01-10T00:00:00Z",
+            expiredAt: "2026-12-31T00:00:00Z",
+        },
+        {
+            id: 2,
+            variantId: 201,
+            batchNumber: "LOT-2026-002",
+            quantity: 80,
+            createdAt: "2026-02-15T00:00:00Z",
+            expiredAt: "2026-03-01T00:00:00Z",
+        },
+    ];
 
     beforeEach(() => {
         vi.clearAllMocks();
-
-        mockUseProductCatalog.mockReturnValue({
-            products: new Map(mockProducts.map((p) => [p.id, p])),
-            loading: false,
-        } as unknown as ReturnType<typeof useProductCatalog>);
-
-        mockUseVariant.mockReturnValue({
-            variants: new Map(mockVariants.map((v) => [v.id, v])),
-            loading: false,
-        } as unknown as ReturnType<typeof useVariant>);
-
-        mockUseInventoryCatalog.mockReturnValue({
-            batches: new Map(mockBatches.map((b) => [b.id, b])),
-            loading: false,
-            refetchInventory: mockRefetchInventory,
-        } as unknown as ReturnType<typeof useInventoryCatalog>);
+        vi.mocked(productService.getActiveProducts).mockResolvedValue(mockProducts);
+        vi.mocked(variantService.getActiveVariants).mockResolvedValue(mockVariants);
+        vi.mocked(batchService.getBatchesByVariantId).mockResolvedValue(mockBatches);
     });
 
-    it("renders loading placeholder when loading is true", () => {
-        mockUseInventoryCatalog.mockReturnValue({
-            batches: new Map(),
-            loading: true,
-            refetchInventory: mockRefetchInventory,
-        } as unknown as ReturnType<typeof useInventoryCatalog>);
+    const renderWithRouter = (ui: React.ReactElement) => {
+        return render(<MemoryRouter>{ui}</MemoryRouter>);
+    };
 
-        render(
-            <MemoryRouter>
-                <InventoryBatches />
-            </MemoryRouter>
-        );
+    it("renders loading state initially and displays batches after resolution", async () => {
+        renderWithRouter(<InventoryBatches />);
+        expect(screen.getByText(/載入批次中/i)).toBeInTheDocument();
 
-        expect(screen.getByText("載入批次中")).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText("LOT-2026-001")).toBeInTheDocument();
+            expect(screen.getByText("LOT-2026-002")).toBeInTheDocument();
+            expect(screen.getAllByText("冷凍鮭魚")).toHaveLength(2);
+            expect(screen.getByText("120")).toBeInTheDocument();
+        });
     });
 
-    it("renders table with batch information, product details, stock quantities, and dates", () => {
-        render(
-            <MemoryRouter>
-                <InventoryBatches />
-            </MemoryRouter>
-        );
+    it("filters batches by batch number or SKU", async () => {
+        renderWithRouter(<InventoryBatches />);
 
-        expect(screen.getByRole("heading", { name: "庫存批次" })).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText("LOT-2026-001")).toBeInTheDocument();
+        });
 
-        // Batch 1 details
-        expect(screen.getByText("BATCH-2026-001")).toBeInTheDocument();
-        expect(screen.getByText("金目鱸魚 - red")).toBeInTheDocument();
-        expect(screen.getByText("BAR-001")).toBeInTheDocument();
-        expect(screen.getByText("2026-05-10")).toBeInTheDocument();
-        expect(screen.getByText("2028-05-09")).toBeInTheDocument();
+        const searchInput = screen.getByPlaceholderText(/搜尋批次/i);
+        fireEvent.change(searchInput, { target: { value: "LOT-2026-002" } });
 
-        // Batch 1 stock quantity & UOM
-        expect(screen.getByText("45")).toBeInTheDocument();
-        expect(screen.getByText("kg")).toBeInTheDocument();
-
-        // Batch 2 details
-        expect(screen.getByText("BATCH-2026-002")).toBeInTheDocument();
-        expect(screen.getByText("Arabica Coffee - Medium Roast")).toBeInTheDocument();
-        expect(screen.getByText("BAR-002")).toBeInTheDocument();
-
-        // Batch 2 stock quantity & UOM
-        expect(screen.getByText("80")).toBeInTheDocument();
-        expect(screen.getByText("bags")).toBeInTheDocument();
-
-        // Row-level text verification
-        const rows = screen.getAllByRole("row");
-        expect(rows[1]).toHaveTextContent("45 kg");
-        expect(rows[2]).toHaveTextContent("80 bags");
+        expect(screen.queryByText("LOT-2026-001")).not.toBeInTheDocument();
+        expect(screen.getByText("LOT-2026-002")).toBeInTheDocument();
     });
 
-    it("filters batches by search term across batch number, product name, and barcode", () => {
-        render(
-            <MemoryRouter>
-                <InventoryBatches />
-            </MemoryRouter>
+    it("displays error panel when services throw", async () => {
+        vi.mocked(productService.getActiveProducts).mockRejectedValue(
+            new Error("批次查詢失敗")
         );
 
-        const searchInput = screen.getByPlaceholderText("搜尋批次、產品或條碼...");
+        renderWithRouter(<InventoryBatches />);
 
-        // Filter by product name
-        fireEvent.change(searchInput, { target: { value: "金目鱸魚" } });
-        expect(screen.getByText("BATCH-2026-001")).toBeInTheDocument();
-        expect(screen.queryByText("BATCH-2026-002")).not.toBeInTheDocument();
-
-        // Filter by barcode
-        fireEvent.change(searchInput, { target: { value: "BAR-002" } });
-        expect(screen.queryByText("BATCH-2026-001")).not.toBeInTheDocument();
-        expect(screen.getByText("BATCH-2026-002")).toBeInTheDocument();
-    });
-
-    it("displays empty message when no batches match filter or batch map is empty", () => {
-        render(
-            <MemoryRouter>
-                <InventoryBatches />
-            </MemoryRouter>
-        );
-
-        const searchInput = screen.getByPlaceholderText("搜尋批次、產品或條碼...");
-        fireEvent.change(searchInput, { target: { value: "NonExistentBatch" } });
-
-        expect(screen.getByText("目前沒有可用批次。")).toBeInTheDocument();
-    });
-
-    it("calls refetchInventory when clicking the refresh button", () => {
-        render(
-            <MemoryRouter>
-                <InventoryBatches />
-            </MemoryRouter>
-        );
-
-        const refreshButton = screen.getByRole("button", { name: "重新整理批次" });
-        fireEvent.click(refreshButton);
-
-        expect(mockRefetchInventory).toHaveBeenCalledTimes(1);
+        await waitFor(() => {
+            expect(screen.getByText(/無法讀取批次/i)).toBeInTheDocument();
+            expect(screen.getByText(/批次查詢失敗/i)).toBeInTheDocument();
+        });
     });
 });

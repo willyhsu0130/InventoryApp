@@ -1,206 +1,147 @@
 // src/pages/__tests__/Inventory.test.tsx
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { ProductProvider } from "@/context/product/ProductProvider";
-import { VariantProvider } from "@/context/variant/VariantProvider";
-import { InventoryProvider } from "@/context/inventory/InventoryProvider";
 import { Inventory } from "../Inventory";
-import { inventoryService } from "@/services/inventoryMovementService";
-import { productService } from "@/services/productService";
-import { variantService } from "@/services/variantService";
-import type {
-    KatanaInventoryItem,
-    KatanaProduct,
-    ProductVariant,
-    KatanaStockAdjustment,
-} from "@my-inventory-app/shared";
-
-// 1. Mock Services
-vi.mock("@/services/inventoryService", () => ({
-    inventoryService: {
-        getInventoryLevels: vi.fn(),
-        getBatches: vi.fn(),
-        getStockAdjustments: vi.fn(),
-        createStockAdjustment: vi.fn(),
-    },
-}));
+import * as productService from "@/services/productService";
+import * as variantService from "@/services/variantService";
+import * as inventoryLevelService from "@/services/inventoryLevelService";
+import type { Product, Variant } from "@my-inventory-app/shared";
 
 vi.mock("@/services/productService", () => ({
-    productService: {
-        getAll: vi.fn(),
-    },
+    getActiveProducts: vi.fn(),
 }));
 
 vi.mock("@/services/variantService", () => ({
-    variantService: {
-        getAll: vi.fn(),
-    },
+    getActiveVariants: vi.fn(),
 }));
 
-vi.mock("@/hooks/useError", () => ({
-    useError: () => ({
-        errorMessage: "",
-        warningMessage: "",
-        setErrorMessage: vi.fn(),
-        setWarningMessage: vi.fn(),
-        clearError: vi.fn(),
-        clearWarning: vi.fn(),
-        clearAll: vi.fn(),
-    }),
+vi.mock("@/services/inventoryLevelService", () => ({
+    getTotalStockByVariantId: vi.fn(),
 }));
 
-const mockedInventoryService = vi.mocked(inventoryService);
-const mockedProductService = vi.mocked(productService);
-const mockedVariantService = vi.mocked(variantService);
+vi.mock("@/components/inventory/InventoryTable", () => ({
+    InventoryTable: ({
+        items,
+        onRowClick,
+    }: {
+        items: Array<{ variantId: number; displayName: string; inStock: number }>;
+        onRowClick?: (id: number) => void;
+    }) => (
+        <div data-testid="mock-inventory-table">
+            {items.map((item) => (
+                <div
+                    key={item.variantId}
+                    data-testid={`inventory-row-${item.variantId}`}
+                    onClick={() => onRowClick?.(item.variantId)}
+                >
+                    <span>{item.displayName}</span>
+                    <span>{item.inStock}</span>
+                </div>
+            ))}
+        </div>
+    ),
+}));
 
-// 2. Mock Fixtures
-const mockProduct: KatanaProduct = {
-    id: 1,
-    name: "Arabica Coffee Beans",
-    type: "product",
-    category_name: "Coffee",
-    uom: "bags",
-    batch_tracked: false,
-    serial_tracked: false,
-    is_sellable: true,
-    is_purchasable: true,
-    is_producible: false,
-    is_auto_assembly: false,
-    is_archived: false,
-    operations_in_sequence: false,
-    purchase_uom: null,
-    purchase_uom_conversion_rate: null,
-    default_supplier_id: null,
-    additional_info: null,
-    custom_field_collection_id: null,
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-    archived_at: null,
-    deleted_at: null,
-    configs: [],
-};
+vi.mock("@/components/inventory/InventoryMovement", () => ({
+    InventoryMovement: () => <div data-testid="mock-inventory-movement">調整庫存表單</div>,
+}));
 
-const mockVariant: ProductVariant = {
-    id: 101,
-    product_id: 1,
-    type: "product",
-    sku: "COF-ARB-01",
-    sales_price: 20,
-    purchase_price: 10,
-    config_attributes: [{ config_name: "Roast", config_value: "Medium" }],
-    supplier_item_codes: [],
-    custom_fields: [],
-    internal_barcode: null,
-    registered_barcode: null,
-    material_id: null,
-    lead_time: null,
-    minimum_order_quantity: null,
-    abc_classification: null,
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-};
+describe("<Inventory /> Page", () => {
+    const mockProducts: Product[] = [
+        {
+            id: 1,
+            name: "金目鱸魚",
+            uom: "kg",
+            batchTracked: true,
+            configs: [{ name: "處理方式", values: ["三去", "輪切"] }],
+            isArchived: false,
+        },
+    ];
 
-const mockInventoryInitial: KatanaInventoryItem = {
-    variant_id: 101,
-    location_id: 1,
-    quantity_in_stock: 50,
-    quantity_committed: 0,
-    quantity_expected: 0,
-    quantity_missing_or_excess: 50,
-    average_cost: 10,
-    value_in_stock: 500,
-    reorder_point: 5,
-};
+    const mockVariants: Variant[] = [
+        {
+            id: 101,
+            productId: 1,
+            sku: "FISH-01",
+            salesPrice: 250,
+            configs: [{ name: "處理方式", value: "三去" }],
+            isArchived: false,
+        },
+        {
+            id: 102,
+            productId: 1,
+            sku: "FISH-02",
+            salesPrice: 280,
+            configs: [{ name: "處理方式", value: "輪切" }],
+            isArchived: false,
+        },
+    ];
 
-const mockInventoryUpdated: KatanaInventoryItem = {
-    ...mockInventoryInitial,
-    quantity_in_stock: 65,
-    quantity_missing_or_excess: 65,
-    value_in_stock: 650,
-};
-
-describe("<Inventory /> Page Integration", () => {
     beforeEach(() => {
         vi.clearAllMocks();
-
-        mockedProductService.getAll.mockResolvedValue([mockProduct]);
-        mockedVariantService.getAll.mockResolvedValue([mockVariant]);
-        mockedInventoryService.getBatches.mockResolvedValue([]);
-        mockedInventoryService.getStockAdjustments.mockResolvedValue([]);
+        vi.mocked(productService.getActiveProducts).mockResolvedValue(mockProducts);
+        vi.mocked(variantService.getActiveVariants).mockResolvedValue(mockVariants);
+        vi.mocked(inventoryLevelService.getTotalStockByVariantId).mockImplementation(async (id) =>
+            id === 101 ? 50 : 20
+        );
     });
 
-    it("updates table values after submitting stock adjustment modal", async () => {
-        let currentInventory = [mockInventoryInitial];
-        mockedInventoryService.getInventoryLevels.mockImplementation(async () => currentInventory);
+    const renderWithRouter = (ui: React.ReactElement) => {
+        return render(<MemoryRouter>{ui}</MemoryRouter>);
+    };
 
-        const createdAdjustment: KatanaStockAdjustment = {
-            id: 10,
-            location_id: 1,
-            stock_adjustment_number: "SA-0010",
-            stock_adjustment_date: new Date().toISOString(),
-            reason: "Surplus inventory",
-            stock_adjustment_rows: [{ id: 1, variant_id: 101, quantity: 15 }],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-        };
+    it("renders loading state initially and hydrates inventory data", async () => {
+        renderWithRouter(<Inventory />);
+        expect(screen.getByText(/準備畫面中/i)).toBeInTheDocument();
 
-        mockedInventoryService.createStockAdjustment.mockImplementation(async () => {
-            currentInventory = [mockInventoryUpdated]; // simulate DB update
-            return createdAdjustment;
+        await waitFor(() => {
+            expect(screen.getByTestId("inventory-row-101")).toBeInTheDocument();
+            expect(screen.getByText("金目鱸魚 - 三去")).toBeInTheDocument();
+            expect(screen.getByText("50")).toBeInTheDocument();
+            expect(screen.getByTestId("inventory-row-102")).toBeInTheDocument();
+            expect(screen.getByText("金目鱸魚 - 輪切")).toBeInTheDocument();
+            expect(screen.getByText("20")).toBeInTheDocument();
+        });
+    });
+
+    it("filters inventory items based on search term", async () => {
+        renderWithRouter(<Inventory />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId("inventory-row-101")).toBeInTheDocument();
         });
 
-        render(
-            <MemoryRouter initialEntries={["/inventory"]}>
-                <ProductProvider>
-                    <VariantProvider>
-                        <InventoryProvider>
-                            <Inventory />
-                        </InventoryProvider>
-                    </VariantProvider>
-                </ProductProvider>
-            </MemoryRouter>
+        const searchInput = screen.getByPlaceholderText(/搜尋產品/i);
+        fireEvent.change(searchInput, { target: { value: "輪切" } });
+
+        expect(screen.queryByTestId("inventory-row-101")).not.toBeInTheDocument();
+        expect(screen.getByTestId("inventory-row-102")).toBeInTheDocument();
+    });
+
+    it("opens stock adjustment modal when clicking '調整庫存' or a row", async () => {
+        renderWithRouter(<Inventory />);
+
+        await waitFor(() => {
+            expect(screen.getByTestId("inventory-row-101")).toBeInTheDocument();
+        });
+
+        const adjustBtn = screen.getByRole("button", { name: /調整庫存/i });
+        fireEvent.click(adjustBtn);
+
+        expect(screen.getByTestId("mock-inventory-movement")).toBeInTheDocument();
+    });
+
+    it("displays error panel when services fail", async () => {
+        vi.mocked(productService.getActiveProducts).mockRejectedValue(
+            new Error("庫存載入失敗")
         );
 
-        // 1. Wait for initial page data to load in the table
-        const cell = await screen.findByText("Arabica Coffee Beans");
-        expect(cell).toBeInTheDocument();
+        renderWithRouter(<Inventory />);
 
-        // 2. Click the table row to open Stock Adjustment modal
-        const tableRow = document.getElementById("101")!;
-        fireEvent.click(tableRow);
-
-        // 3. Find the quantity number input inside the modal and change to 65
-        const targetInput = await screen.findByDisplayValue("50");
-        fireEvent.change(targetInput, { target: { value: "65" } });
-
-        // 4. Fill in the optional adjustment reason
-        const reasonInput = screen.getByPlaceholderText("例如: 盤點差異、耗損");
-        fireEvent.change(reasonInput, { target: { value: "Surplus inventory" } });
-
-        // 5. Submit modal using the Save button
-        const saveButton = screen.getByRole("button", { name: /儲存|確定|確認/i });
-        fireEvent.click(saveButton);
-
-        // 6. Verify service was called with the calculated delta (+15)
         await waitFor(() => {
-            expect(mockedInventoryService.createStockAdjustment).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    location_id: 1,
-                    reason: "Surplus inventory",
-                    stock_adjustment_rows: [{ variant_id: 101, quantity: 15 }],
-                })
-            );
-        });
-
-        // 7. Verify the inventory table on the page refreshed to 65
-        // 7. Verify the inventory table on the page refreshed to 65
-        await waitFor(() => {
-            const row = document.getElementById("101")!;
-            expect(row).toBeInTheDocument();
-            expect(row.textContent).toContain("65 bags");
-            expect(row.textContent).toContain("$650.00");
-            expect(row.textContent).not.toContain("50 bags");
+            expect(screen.getByText(/無法讀取庫存/i)).toBeInTheDocument();
+            expect(screen.getByText(/庫存載入失敗/i)).toBeInTheDocument();
         });
     });
 });

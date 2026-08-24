@@ -1,33 +1,30 @@
-import { useImperativeHandle, useMemo, useState, useCallback } from "react";
+import { useImperativeHandle, useMemo, useState, useEffect } from "react";
 import { X, Calendar as CalendarIcon } from "lucide-react";
 import { CONTROL_INPUT, ERROR_PANEL, FIELD_LABEL } from "@/lib/styles";
-import { useInventoryCatalog, useProductCatalog, useVariant } from "@/hooks/useContexts";
-import type {
-    KatanaBatch,
-    KatanaInventoryItem,
-    KatanaStockAdjustmentRowInput,
-    KatanaTraceabilityEntry,
-} from "@my-inventory-app/shared";
-
+import type { Batch } from "@my-inventory-app/shared";
+import { createInventoryMovement } from "@/services/inventoryMovementService";
+import { createBatch, getBatchesByVariantId } from "@/services/batchService";
+import { getProductById } from "@/services/productService";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { addYears, format, subDays } from "date-fns";
+import type { DisplayInventoryRow } from "@/components/inventory/InventoryTable";
 
 const NEW_BATCH_VALUE = "__new__";
 const DEFAULT_LOCATION_ID = 1;
 const DEFAULT_LOCATION_NAME = "晁欣";
 
-export interface StockAdjustmentHandle {
+export interface InventoryMovementHandle {
     submit: () => Promise<void>;
 }
 
-interface StockAdjustmentProps {
-    items: KatanaInventoryItem[];
+interface InventoryMovementProps {
+    items: DisplayInventoryRow[];
     initialVariantId?: number | null;
     onSavingChange?: (isSaving: boolean) => void;
     onSuccess: () => void;
-    ref?: React.Ref<StockAdjustmentHandle>;
+    ref?: React.Ref<InventoryMovementHandle>;
 }
 
 interface AdjustmentDraftRow {
@@ -45,17 +42,13 @@ const getDefaultBatchNumber = (expirationDate?: Date): string =>
 const getDefaultBatchExpirationDate = (): Date =>
     subDays(addYears(new Date(), 2), 1);
 
-export const StockAdjustment = ({
+export const InventoryMovement = ({
     items,
     initialVariantId,
     onSavingChange,
     onSuccess,
     ref,
-}: StockAdjustmentProps) => {
-    const { products } = useProductCatalog();
-    const { variants } = useVariant();
-    const { batches, createBatch, createStockAdjustment } = useInventoryCatalog();
-
+}: InventoryMovementProps) => {
     const [locationId] = useState<number>(DEFAULT_LOCATION_ID);
     const [rows, setRows] = useState<AdjustmentDraftRow[]>(() =>
         initialVariantId != null
@@ -67,62 +60,85 @@ export const StockAdjustment = ({
     const [adjustmentCalendarOpen, setAdjustmentCalendarOpen] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
-    const getVariantMetadata = useCallback(
-        (variantId: number) => {
-            const variant = variants.get(variantId);
-            const product = variant ? products.get(variant.product_id) : undefined;
-            const detailsString = variant?.config_attributes
-                ?.map((attr) => attr.config_value)
-                .filter(Boolean)
-                .join(" / ");
-
-            return {
-                product,
-                variant,
-                product_name: product?.name ?? `Variant #${variantId}`,
-                variant_details: detailsString || undefined,
-                is_batch_tracked: product?.batch_tracked ?? false,
-            };
-        },
-        [products, variants]
-    );
-
-    const stockByVariant = useMemo(() => {
-        const byVariant = new Map<number, number>();
+    // Fast O(1) item lookup
+    const itemMap = useMemo(() => {
+        const map = new Map<number, DisplayInventoryRow>();
         for (const item of items) {
-            // Fall back to matching all items if location_id doesn't strictly match
-            if (locationId != null && item.location_id != null && item.location_id !== locationId) continue;
-            byVariant.set(item.variant_id, Number(item.quantity_in_stock) || 0);
+            map.set(item.variantId, item);
         }
-        return byVariant;
-    }, [items, locationId]);;
+        return map;
+    }, [items]);
 
-    const batchesByVariant = useMemo(() => {
-        const byVariant = new Map<number, KatanaBatch[]>();
-        for (const b of batches.values()) {
-            const list = byVariant.get(b.variant_id) ?? [];
-            list.push(b);
-            byVariant.set(b.variant_id, list);
-        }
-        return byVariant;
-    }, [batches]);
+    // Metadata caches (record lookup without dependency loops)
+    const [batchTrackedMap, setBatchTrackedMap] = useState<Record<number, boolean>>({});
+    const [batchesByVariant, setBatchesByVariant] = useState<Record<number, Batch[]>>({});
+
+    // Fetch batch tracked status and existing batches safely
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadMetadata = async () => {
+            for (const row of rows) {
+                const item = itemMap.get(row.variantId);
+                if (!item) continue;
+
+                // 1. Check parent product batch tracking
+                let isBatchTracked = batchTrackedMap[row.variantId];
+                if (isBatchTracked === undefined) {
+                    try {
+                        const product = await getProductById(item.productId);
+                        isBatchTracked = product.batchTracked;
+                        if (isMounted) {
+                            setBatchTrackedMap((prev) => ({
+                                ...prev,
+                                [row.variantId]: product.batchTracked,
+                            }));
+                        }
+                    } catch {
+                        isBatchTracked = false;
+                    }
+                }
+
+                // 2. Fetch existing batches if product is batch tracked
+                if (isBatchTracked && batchesByVariant[row.variantId] === undefined) {
+                    try {
+                        const batches = await getBatchesByVariantId(row.variantId);
+                        if (isMounted) {
+                            setBatchesByVariant((prev) => ({
+                                ...prev,
+                                [row.variantId]: batches,
+                            }));
+                        }
+                    } catch {
+                        if (isMounted) {
+                            setBatchesByVariant((prev) => ({
+                                ...prev,
+                                [row.variantId]: [],
+                            }));
+                        }
+                    }
+                }
+            }
+        };
+
+        loadMetadata();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [rows, itemMap]); // <-- Clean dependency array: no self-triggering state
 
     const selectableVariants = useMemo(() => {
         const alreadyAdded = new Set(rows.map((row) => row.variantId));
 
         return items
-            .filter((item) => !alreadyAdded.has(item.variant_id)) // <-- Don't choke if item.location_id is missing or different
-            .map((item) => {
-                const meta = getVariantMetadata(item.variant_id);
-                return {
-                    variantId: item.variant_id,
-                    label: meta.variant_details
-                        ? `${meta.product_name} - ${meta.variant_details}`
-                        : meta.product_name,
-                };
-            })
+            .filter((item) => !alreadyAdded.has(item.variantId))
+            .map((item) => ({
+                variantId: item.variantId,
+                label: item.displayName,
+            }))
             .sort((a, b) => a.label.localeCompare(b.label));
-    }, [items, rows, getVariantMetadata]);
+    }, [items, rows]);
 
     const handleAddRow = (variantId: number) => {
         setFormError(null);
@@ -156,11 +172,12 @@ export const StockAdjustment = ({
                     };
                 }
                 if (value === NEW_BATCH_VALUE) {
+                    const defaultExp = getDefaultBatchExpirationDate();
                     return {
                         ...row,
                         batchId: "new",
-                        expirationDate: getDefaultBatchExpirationDate(),
-                        newBatchNumber: getDefaultBatchNumber(getDefaultBatchExpirationDate()),
+                        expirationDate: defaultExp,
+                        newBatchNumber: getDefaultBatchNumber(defaultExp),
                         batchNameAutoGenerated: true,
                     };
                 }
@@ -209,7 +226,8 @@ export const StockAdjustment = ({
 
     const getEffectiveQuantityString = (row: AdjustmentDraftRow): string => {
         if (row.targetQuantity !== undefined) return row.targetQuantity;
-        return String(stockByVariant.get(row.variantId) ?? 0);
+        const currentStock = itemMap.get(row.variantId)?.inStock ?? 0;
+        return String(currentStock);
     };
 
     const deltaFor = (row: AdjustmentDraftRow): number | null => {
@@ -219,11 +237,22 @@ export const StockAdjustment = ({
         const target = Number(rawStr);
         if (Number.isNaN(target)) return null;
 
-        return roundQuantity(target - (stockByVariant.get(row.variantId) ?? 0));
+        const currentStock = itemMap.get(row.variantId)?.inStock ?? 0;
+        return roundQuantity(target - currentStock);
     };
 
     const handleSave = async () => {
-        const adjustmentRows: KatanaStockAdjustmentRowInput[] = [];
+        if (rows.length === 0) {
+            setFormError("請至少新增一個調整項目。");
+            return;
+        }
+
+        const pendingOperations: Array<{
+            variantId: number;
+            delta: number;
+            batchId: number | null;
+            newBatchDraft?: { number: string; expiredAt: string };
+        }> = [];
 
         for (const row of rows) {
             const rawStr = getEffectiveQuantityString(row);
@@ -239,48 +268,55 @@ export const StockAdjustment = ({
                 return;
             }
 
-            const delta = roundQuantity(target - (stockByVariant.get(row.variantId) ?? 0));
+            const currentStock = itemMap.get(row.variantId)?.inStock ?? 0;
+            const delta = roundQuantity(target - currentStock);
             if (delta === 0) continue;
 
-            let traceability: KatanaTraceabilityEntry[] | undefined;
-            const meta = getVariantMetadata(row.variantId);
+            const isBatchTracked = batchTrackedMap[row.variantId] ?? false;
 
-            if (meta.is_batch_tracked && row.batchId !== undefined) {
-                let resolvedBatchId: number;
+            if (isBatchTracked) {
+                if (!row.batchId) {
+                    setFormError(`請為批次追蹤商品設定批次。`);
+                    return;
+                }
 
                 if (row.batchId === "new") {
-                    const trimmed = row.newBatchNumber?.trim();
-                    if (!trimmed) {
+                    const trimmedBatchNum = row.newBatchNumber?.trim();
+                    if (!trimmedBatchNum) {
                         setFormError("請輸入新批次編號。");
                         return;
                     }
-                    try {
-                        const created = await createBatch({
-                            batch_number: trimmed,
-                            variant_id: row.variantId,
-                            batch_created_date: format(new Date(), "yyyy-MM-dd"),
-                            expiration_date: row.expirationDate ? row.expirationDate.toISOString() : undefined,
-                        });
-                        resolvedBatchId = created.id;
-                    } catch (err: unknown) {
-                        setFormError(err instanceof Error ? err.message : "建立批次失敗。");
+                    if (!row.expirationDate) {
+                        setFormError("請選擇新批次的有效日期。");
                         return;
                     }
+
+                    pendingOperations.push({
+                        variantId: row.variantId,
+                        delta,
+                        batchId: null,
+                        newBatchDraft: {
+                            number: trimmedBatchNum,
+                            expiredAt: row.expirationDate.toISOString(),
+                        },
+                    });
                 } else {
-                    resolvedBatchId = row.batchId;
+                    pendingOperations.push({
+                        variantId: row.variantId,
+                        delta,
+                        batchId: row.batchId,
+                    });
                 }
-
-                traceability = [{ batch_id: resolvedBatchId, quantity: String(delta) }];
+            } else {
+                pendingOperations.push({
+                    variantId: row.variantId,
+                    delta,
+                    batchId: null,
+                });
             }
-
-            adjustmentRows.push({
-                variant_id: row.variantId,
-                quantity: delta,
-                ...(traceability && { traceability }),
-            });
         }
 
-        if (adjustmentRows.length === 0) {
+        if (pendingOperations.length === 0) {
             setFormError("沒有任何數量變動。");
             return;
         }
@@ -289,18 +325,32 @@ export const StockAdjustment = ({
         onSavingChange?.(true);
 
         try {
-            const data = await createStockAdjustment({
-                location_id: locationId,
-                stock_adjustment_date: adjustmentDate ? adjustmentDate.toISOString() : undefined,
-                reason,
-                stock_adjustment_rows: adjustmentRows,
-            });
+            for (const op of pendingOperations) {
+                let resolvedBatchId = op.batchId;
 
-            if (data) {
-                onSuccess();
-            } else {
-                setFormError("庫存調整失敗。");
+                // 1. Create batch first if new
+                if (op.newBatchDraft) {
+                    const createdBatch = await createBatch({
+                        variantId: op.variantId,
+                        batchNumber: op.newBatchDraft.number,
+                        quantity: Math.max(op.delta, 0),
+                        expiredAt: op.newBatchDraft.expiredAt,
+                    });
+                    resolvedBatchId = createdBatch.id;
+                }
+
+                // 2. Post ledger movement
+                await createInventoryMovement({
+                    variantId: op.variantId,
+                    batchId: resolvedBatchId,
+                    quantityAdjusted: op.delta,
+                    locationId,
+                    referenceType: "ADJUSTMENT",
+                    referenceId: reason.trim() ? reason.trim() : null,
+                });
             }
+
+            onSuccess();
         } catch (err: unknown) {
             setFormError(err instanceof Error ? err.message : "庫存調整失敗。");
         } finally {
@@ -314,7 +364,7 @@ export const StockAdjustment = ({
         <div className="flex flex-col gap-y-5">
             {formError && <div className={ERROR_PANEL}>{formError}</div>}
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="flex flex-col gap-y-1">
                     <label className={FIELD_LABEL}>倉庫</label>
                     <input
@@ -361,46 +411,47 @@ export const StockAdjustment = ({
                 </div>
             </div>
 
-            <div className="rounded-lg border border-slate-800 overflow-hidden">
-                <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="bg-slate-950 text-slate-400 font-medium text-xs uppercase tracking-wider">
+            <div className="rounded-lg border border-border overflow-hidden">
+                <table className="w-full text-left text-sm text-foreground">
+                    <thead className="bg-muted text-muted-foreground font-medium text-xs uppercase tracking-wider">
                         <tr>
-                            <th className="py-3 px-4 border-b border-slate-800">商品 / 規格</th>
-                            <th className="py-3 px-4 border-b border-slate-800 text-right">目前庫存</th>
-                            <th className="py-3 px-4 border-b border-slate-800 text-right">調整後數量</th>
-                            <th className="py-3 px-4 border-b border-slate-800">批次與有效日期</th>
-                            <th className="py-3 px-4 border-b border-slate-800 text-right">變動</th>
-                            <th className="py-3 px-4 border-b border-slate-800 w-10" />
+                            <th className="py-3 px-4 border-b border-border">商品 / 規格</th>
+                            <th className="py-3 px-4 border-b border-border text-right">目前庫存</th>
+                            <th className="py-3 px-4 border-b border-border text-right">調整後數量</th>
+                            <th className="py-3 px-4 border-b border-border">批次與有效日期</th>
+                            <th className="py-3 px-4 border-b border-border text-right">變動</th>
+                            <th className="py-3 px-4 border-b border-border w-10" />
                         </tr>
                     </thead>
                     <tbody className="font-mono text-xs">
                         {rows.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="py-8 text-center text-slate-500 font-sans">
+                                <td colSpan={6} className="py-8 text-center text-muted-foreground font-sans">
                                     請在下方新增要調整的商品。
                                 </td>
                             </tr>
                         ) : (
                             rows.map((row) => {
-                                const meta = getVariantMetadata(row.variantId);
-                                const current = stockByVariant.get(row.variantId) ?? 0;
+                                const item = itemMap.get(row.variantId);
+                                const isBatchTracked = batchTrackedMap[row.variantId] ?? false;
+                                const current = item?.inStock ?? 0;
                                 const effectiveQtyStr = getEffectiveQuantityString(row);
                                 const delta = deltaFor(row);
-                                const variantBatches = batchesByVariant.get(row.variantId) ?? [];
+                                const variantBatches = batchesByVariant[row.variantId] ?? [];
 
                                 return (
-                                    <tr key={row.variantId} className="border-b border-slate-800/40">
+                                    <tr key={row.variantId} className="border-b border-border/40">
                                         <td className="py-2.5 px-4 font-sans">
-                                            <div className="font-medium text-slate-100">
-                                                {meta.product_name}
+                                            <div className="font-medium text-foreground">
+                                                {item?.productName ?? `款式 #${row.variantId}`}
                                             </div>
-                                            {meta.variant_details && (
+                                            {item?.configValues && item.configValues.length > 0 && (
                                                 <div className="text-xs text-muted-foreground mt-0.5">
-                                                    {meta.variant_details}
+                                                    {item.configValues.join(" / ")}
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="py-2.5 px-4 text-right text-slate-400">
+                                        <td className="py-2.5 px-4 text-right text-muted-foreground">
                                             {current}
                                         </td>
                                         <td className="py-2.5 px-4 text-right">
@@ -408,7 +459,7 @@ export const StockAdjustment = ({
                                                 type="number"
                                                 step="any"
                                                 min="0"
-                                                className="w-28 text-right bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-2 py-1 text-slate-100 focus:outline-none transition"
+                                                className="w-28 text-right bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none transition"
                                                 value={effectiveQtyStr}
                                                 onChange={(e) =>
                                                     handleTargetChange(row.variantId, e.target.value)
@@ -416,11 +467,11 @@ export const StockAdjustment = ({
                                             />
                                         </td>
                                         <td className="py-2.5 px-4 gap-x-3">
-                                            {meta.is_batch_tracked ? (
+                                            {isBatchTracked ? (
                                                 <div className="flex gap-x-3 items-center w-full">
                                                     <div className="flex flex-col gap-y-1 w-full">
                                                         <select
-                                                            className="bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition"
+                                                            className="bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition text-xs"
                                                             value={
                                                                 row.batchId === "new"
                                                                     ? NEW_BATCH_VALUE
@@ -431,20 +482,18 @@ export const StockAdjustment = ({
                                                             }
                                                         >
                                                             <option value="">選擇批次...</option>
-                                                            {variantBatches
-                                                                .filter((b) => b.batch_number !== "Unbatched")
-                                                                .map((b) => (
-                                                                    <option key={b.id} value={b.id}>
-                                                                        {b.batch_number}
-                                                                    </option>
-                                                                ))}
+                                                            {variantBatches.map((b) => (
+                                                                <option key={b.id} value={b.id}>
+                                                                    {b.batchNumber}
+                                                                </option>
+                                                            ))}
                                                             <option value={NEW_BATCH_VALUE}>+ 新增批次...</option>
                                                         </select>
                                                         {row.batchId === "new" && (
                                                             <input
                                                                 type="text"
                                                                 placeholder="新批次編號"
-                                                                className="bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition"
+                                                                className="bg-background border border-input focus:border-ring rounded px-2 py-1 text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition text-xs"
                                                                 value={row.newBatchNumber ?? ""}
                                                                 onChange={(e) =>
                                                                     handleNewBatchNumberChange(
@@ -464,9 +513,9 @@ export const StockAdjustment = ({
                                                                         <Button
                                                                             variant="outline"
                                                                             size="sm"
-                                                                            className="bg-slate-900 border-slate-700 text-slate-200 hover:bg-slate-800 text-xs px-2.5"
+                                                                            className="bg-background border-input text-foreground hover:bg-muted text-xs px-2.5"
                                                                         >
-                                                                            <CalendarIcon className="h-3.5 w-3.5 mr-1 text-slate-400" />
+                                                                            <CalendarIcon className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
                                                                             {row.expirationDate
                                                                                 ? format(row.expirationDate, "yyyy/MM/dd")
                                                                                 : "有效日期"}
@@ -485,15 +534,15 @@ export const StockAdjustment = ({
                                                     )}
                                                 </div>
                                             ) : (
-                                                <span className="text-slate-600">—</span>
+                                                <span className="text-muted-foreground">—</span>
                                             )}
                                         </td>
                                         <td
                                             className={`py-2.5 px-4 text-right font-medium ${delta === null || delta === 0
-                                                ? "text-slate-500"
-                                                : delta > 0
-                                                    ? "text-emerald-400"
-                                                    : "text-amber-400"
+                                                    ? "text-muted-foreground"
+                                                    : delta > 0
+                                                        ? "text-emerald-400"
+                                                        : "text-amber-400"
                                                 }`}
                                         >
                                             {delta === null ? "—" : delta > 0 ? `+${delta}` : delta}
@@ -502,7 +551,7 @@ export const StockAdjustment = ({
                                             <button
                                                 type="button"
                                                 onClick={() => handleRemoveRow(row.variantId)}
-                                                className="text-slate-500 hover:text-red-400 p-1"
+                                                className="text-muted-foreground hover:text-destructive p-1 transition-colors"
                                                 title="移除"
                                             >
                                                 <X className="w-4 h-4" />

@@ -1,62 +1,77 @@
 // src/components/orders/OrdersTable.tsx
-import type { KatanaSalesOrder, KatanaSalesOrderStatus } from "../../models/katana/salesOrder";
+import type { FC } from "react";
 import { DataTable, type Column } from "../DataTable";
 import { format } from "date-fns";
 
+export interface DisplaySalesOrderItem {
+    variantId: number;
+    productName: string;
+    sku: string;
+    specs: string;
+    quantity: number;
+    pricePerUnit: number;
+}
+
+export interface DisplaySalesOrderRow {
+    id: number;
+    customerId: number;
+    customerName: string;
+    locationId: number;
+    locationName: string;
+    status: "PENDING" | "COMPLETED";
+    totalQuantity: number;
+    totalPrice: number;
+    createdAt: string;
+    items: DisplaySalesOrderItem[];
+}
+
 interface OrdersTableProps {
-    items: KatanaSalesOrder[];
+    items: DisplaySalesOrderRow[];
     /** Callback fired when clicking an order row. */
     onRowClick?: (orderId: number) => void;
     visibleColumns?: Record<string, boolean>;
 }
 
 /** Render styled badges for sales order status */
-const renderStatusBadge = (status: KatanaSalesOrderStatus) => {
+const renderStatusBadge = (status: DisplaySalesOrderRow["status"]) => {
     switch (status) {
-        case "DELIVERED":
+        case "COMPLETED":
             return (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-950/60 text-emerald-400 border border-emerald-800/50 font-sans">
-                    已交貨 (Delivered)
+                    已完成 (Completed)
                 </span>
             );
-        case "PACKED":
-            return (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-teal-950/60 text-teal-400 border border-teal-800/50 font-sans">
-                    已打包 (Packed)
-                </span>
-            );
-        case "PARTIALLY_DELIVERED":
-        case "PARTIALLY_PACKED":
-            return (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-950/60 text-blue-400 border border-blue-800/50 font-sans">
-                    部分處理 (Partial)
-                </span>
-            );
-        case "CANCELLED":
-            return (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-950/60 text-red-400 border border-red-800/50 font-sans">
-                    已取消
-                </span>
-            );
-        case "NOT_SHIPPED":
+        case "PENDING":
         default:
             return (
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-950/60 text-amber-400 border border-amber-800/50 font-sans">
-                    未出貨
+                    處理中 (Pending)
                 </span>
             );
     }
 };
 
-export const OrdersTable = ({ items, onRowClick, visibleColumns }: OrdersTableProps) => {
-    // Define all possible columns with matching IDs
-    const allColumns: (Column<KatanaSalesOrder> & { id: string })[] = [
+export const OrdersTable: FC<OrdersTableProps> = ({
+    items,
+    onRowClick,
+    visibleColumns,
+}) => {
+    const allColumns: (Column<DisplaySalesOrderRow> & { id: string })[] = [
         {
             id: "orderNo",
             header: "訂單編號",
             render: (order) => (
                 <span className="font-mono font-medium text-slate-100 text-sm">
-                    {order.order_no}
+                    SO-{order.id.toString().padStart(5, "0")}
+                </span>
+            ),
+        },
+        {
+            id: "customer",
+            header: "客戶名稱",
+            render: (order) => (
+                <span className="font-sans font-medium text-slate-200">
+                    {order.customerName}
                 </span>
             ),
         },
@@ -67,50 +82,27 @@ export const OrdersTable = ({ items, onRowClick, visibleColumns }: OrdersTablePr
             render: (order) => renderStatusBadge(order.status),
         },
         {
-            id: "deliveryDate",
-            header: "預計交貨日",
-            render: (order) => (
-                <span className="text-slate-400 text-xs font-mono">
-                    {order.delivery_date
-                        ? format(new Date(order.delivery_date), "yyyy/MM/dd")
-                        : "—"}
-                </span>
-            ),
-        },
-        {
             id: "itemCount",
             header: "項目數量",
             align: "center",
-            render: (order) => {
-                const totalItems = order.sales_order_rows?.reduce(
-                    (sum, row) => sum + row.quantity,
-                    0
-                ) ?? 0;
-
-                return (
-                    <span className="text-slate-300 font-mono text-xs">
-                        {order.sales_order_rows?.length ?? 0} 款 ({totalItems} 件)
-                    </span>
-                );
-            },
+            render: (order) => (
+                <span className="text-slate-300 font-mono text-xs">
+                    {order.items.length} 款 ({order.totalQuantity} 件)
+                </span>
+            ),
         },
         {
             id: "total",
             header: "訂單總額",
             align: "right",
-            render: (order) => {
-                const currencyPrefix = order.currency === "TWD" ? "NT$" : "$";
-                const amount = order.total ?? 0;
-
-                return (
-                    <span className="text-emerald-400 font-medium font-mono text-sm">
-                        {currencyPrefix}{amount.toLocaleString(undefined, {
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 2,
-                        })}
-                    </span>
-                );
-            },
+            render: (order) => (
+                <span className="text-emerald-400 font-medium font-mono text-sm">
+                    ${order.totalPrice.toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                    })}
+                </span>
+            ),
         },
         {
             id: "createdAt",
@@ -118,15 +110,14 @@ export const OrdersTable = ({ items, onRowClick, visibleColumns }: OrdersTablePr
             align: "right",
             render: (order) => (
                 <span className="text-slate-500 text-xs font-mono">
-                    {order.created_at
-                        ? format(new Date(order.created_at), "yyyy/MM/dd")
+                    {order.createdAt
+                        ? format(new Date(order.createdAt), "yyyy/MM/dd")
                         : "—"}
                 </span>
             ),
         },
     ];
 
-    // Filter columns based on visibleColumns prop (defaults to visible if prop isn't passed)
     const activeColumns = allColumns.filter(
         (col) => visibleColumns?.[col.id] ?? true
     );

@@ -1,138 +1,150 @@
-import { useState, useMemo, useRef } from "react";
-import { useProductCatalog, useVariant } from "../hooks/useContexts";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ProductsTable } from "../components/products/ProductsTable";
 import { Plus } from "lucide-react";
-import { useError } from "../hooks/useError";
 import { EditModal } from "../components/EditModal";
 import { EditProduct, type EditProductHandle } from "../components/products/EditProduct";
-import {
-    UNSAVED_PRODUCT_ID,
-    type KatanaProduct,
-    type VariantConfigAttribute,
-    type ProductVariant,
-} from "@my-inventory-app/shared";
+import type { Product, Variant } from "@my-inventory-app/shared";
+import { getActiveProducts, deleteProduct } from "@/services/productService";
+import { getActiveVariants } from "@/services/variantService";
 import { Button } from "@/components/ui/button";
 import { RefreshButton } from "@/components/RefreshButton";
 import { CONTROL_INPUT } from "@/lib/styles";
+
+const UNSAVED_PRODUCT_ID = -1;
 
 export interface DisplayProductRow {
     id: number;              // Product ID
     variantId: number;       // Variant ID
     name: string;            // Formatted Name (e.g. "金目鱸魚 - 三去")
-    sku: string;             // SKU string or empty string
+    sku: string;             // SKU string
     salesPrice: number;
     purchasePrice: number;
-    uom: string;             // Unit of measure (e.g. "pcs", "box")
+    uom: string;             // Unit of measure
     configValues: string[];  // Raw variant attribute values
-    categoryName?: string;   // Optional category name if present
+}
+
+async function loadCatalogRows(): Promise<DisplayProductRow[]> {
+    // 1. Fetch both active variants and products in parallel (2 total requests)
+    const [variants, products] = await Promise.all([
+        getActiveVariants(),
+        getActiveProducts(),
+    ]);
+
+    // 2. Build product lookup map for O(1) attribute resolution
+    const productMap = new Map<number, Product>();
+    products.forEach((p) => productMap.set(p.id, p));
+
+    // 3. Iterate over variants as the primary row entity
+    return variants.map((variant: Variant): DisplayProductRow => {
+        const parentProduct = productMap.get(variant.productId);
+        const parentName = parentProduct?.name ?? "未命名產品";
+        const uom = parentProduct?.uom ?? "pcs";
+
+        const configValues: string[] = (variant.configs ?? [])
+            .map((c) => c.value)
+            .filter((val): boolean => Boolean(val?.trim()));
+
+        const displayName =
+            configValues.length > 0
+                ? `${parentName} - ${configValues.join(" / ")}`
+                : parentName;
+
+        return {
+            id: variant.productId,
+            variantId: variant.id,
+            name: displayName,
+            sku: variant.sku ?? "",
+            salesPrice: variant.salesPrice ?? 0,
+            purchasePrice: 0,
+            uom,
+            configValues,
+        };
+    });
 }
 
 export const Products = () => {
-    const { products, loading: productsLoading, refetchProducts, deleteProduct } = useProductCatalog();
-    const { variants, loading: variantsLoading, refetchVariants } = useVariant();
-    const { errorMessage } = useError();
+    const [rows, setRows] = useState<DisplayProductRow[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const [searchTerm, setSearchTerm] = useState<string>("");
-    // selectedProductId: null = closed, UNSAVED_PRODUCT_ID = create mode, >0 = edit mode
     const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
     const [isSaving, setIsSaving] = useState<boolean>(false);
     const editProductRef = useRef<EditProductHandle>(null);
 
     const isCreating = selectedProductId === UNSAVED_PRODUCT_ID;
-    const isLoading = productsLoading || variantsLoading;
+
+    // Async loader for manual events (Refresh, Create, Delete)
+    const refreshCatalog = useCallback(async () => {
+        setIsLoading(true);
+        setErrorMessage(null);
+        try {
+            const displayRows = await loadCatalogRows();
+            setRows(displayRows);
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : "Failed to load product catalog.");
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Initial mount effect with cleanup flag
+    useEffect(() => {
+        let isMounted = true;
+
+        loadCatalogRows()
+            .then((displayRows) => {
+                if (isMounted) {
+                    setRows(displayRows);
+                    setIsLoading(false);
+                }
+            })
+            .catch((err) => {
+                if (isMounted) {
+                    setErrorMessage(err instanceof Error ? err.message : "Failed to load product catalog.");
+                    setIsLoading(false);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const handleCreateProduct = () => {
         setSelectedProductId(UNSAVED_PRODUCT_ID);
     };
 
     const handleDeleteProduct = async () => {
-        if (!selectedProductId) return;
-        await deleteProduct(selectedProductId);
-        setSelectedProductId(null);
+        if (!selectedProductId || selectedProductId === UNSAVED_PRODUCT_ID) return;
+        try {
+            await deleteProduct(selectedProductId);
+            setSelectedProductId(null);
+            await refreshCatalog();
+        } catch (err) {
+            setErrorMessage(err instanceof Error ? err.message : "Failed to delete product.");
+        }
     };
 
     const handleCloseModal = () => {
         if (isSaving) return;
         setSelectedProductId(null);
+        refreshCatalog()
     };
 
-    const handleRefresh = async () => {
-        await Promise.all([refetchProducts(), refetchVariants()]);
-    };
-
-    // Group variants by product_id for fast O(1) lookup
-    const productList = useMemo<DisplayProductRow[]>(() => {
-        const variantsByProductId = new Map<number, ProductVariant[]>();
-
-        variants.forEach((variant: ProductVariant) => {
-            const list = variantsByProductId.get(variant.product_id);
-            if (list) {
-                list.push(variant);
-            } else {
-                variantsByProductId.set(variant.product_id, [variant]);
-            }
-        });
-
-        return Array.from(products.values()).flatMap((product: KatanaProduct): DisplayProductRow[] => {
-            const productVariants: ProductVariant[] = variantsByProductId.get(product.id) ?? [];
-
-            // Fallback row if product has no variants configured
-            if (productVariants.length === 0) {
-                return [
-                    {
-                        id: product.id,
-                        variantId: -1,
-                        name: product.name,
-                        sku: "",
-                        salesPrice: 0,
-                        purchasePrice: 0,
-                        uom: product.uom ?? "pcs",
-                        configValues: [],
-                        categoryName: product.category_name ?? undefined,
-                    },
-                ];
-            }
-
-            return productVariants.map((variant: ProductVariant): DisplayProductRow => {
-                const configValues: string[] = (variant.config_attributes ?? [])
-                    .map((attr: VariantConfigAttribute) => attr.config_value)
-                    .filter((val: string): boolean => Boolean(val?.trim()));
-
-                const displayName =
-                    configValues.length > 0
-                        ? `${product.name} - ${configValues.join(" / ")}`
-                        : product.name;
-
-                return {
-                    id: product.id,
-                    variantId: variant.id,
-                    name: displayName,
-                    sku: variant.sku ?? "",
-                    salesPrice: variant.sales_price ?? 0,
-                    purchasePrice: variant.purchase_price ?? 0,
-                    uom: product.uom ?? "pcs",
-                    configValues,
-                    categoryName: product.category_name ?? undefined,
-                };
-            });
-        });
-    }, [products, variants]);
-
-    // Filter across Name, SKU, ID, or Category
     const filteredProducts = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
-        if (!term) return productList;
+        if (!term) return rows;
 
-        return productList.filter((item) => {
+        return rows.filter((item) => {
             return (
                 item.name.toLowerCase().includes(term) ||
                 item.sku.toLowerCase().includes(term) ||
-                item.categoryName?.toLowerCase().includes(term) ||
                 item.variantId.toString().includes(term) ||
                 item.id.toString().includes(term)
             );
         });
-    }, [productList, searchTerm]);
+    }, [rows, searchTerm]);
 
     return (
         <div className="p-6 space-y-6 text-slate-100 flex flex-col h-full min-h-0" id="productsPage">
@@ -143,21 +155,18 @@ export const Products = () => {
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                    {/* Refresh Button */}
-                    <RefreshButton label="重新整理目錄" onClick={handleRefresh} />
+                    <RefreshButton label="重新整理目錄" onClick={refreshCatalog} />
 
-                    {/* Search Input Container */}
                     <div className="w-full sm:w-80">
                         <input
                             type="text"
-                            placeholder="搜尋產品名稱、SKU 或類別..."
+                            placeholder="搜尋產品名稱、SKU 或編號..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className={CONTROL_INPUT}
                         />
                     </div>
 
-                    {/* Plus Button */}
                     <Button
                         id="createButton"
                         type="button"
@@ -170,7 +179,7 @@ export const Products = () => {
                 </div>
             </div>
 
-            {/* Loading / Error / Table States */}
+            {/* Content Table State */}
             <div className="flex-1 w-full min-h-0" id="bottomContainer">
                 {isLoading ? (
                     <div className="flex justify-center items-center h-48 text-slate-400">
@@ -206,7 +215,10 @@ export const Products = () => {
                         ref={editProductRef}
                         id={selectedProductId}
                         onSavingChange={setIsSaving}
-                        onCreated={() => setSelectedProductId(null)}
+                        onCreated={async () => {
+                            setSelectedProductId(null);
+                            await refreshCatalog();
+                        }}
                     />
                 )}
             </EditModal>

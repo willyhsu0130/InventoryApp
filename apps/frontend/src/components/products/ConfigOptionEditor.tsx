@@ -2,18 +2,18 @@ import { useState } from "react";
 import { X, Plus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CONTROL_INPUT, FIELD_LABEL } from "@/lib/styles";
-import type { KatanaProductConfig } from "@/models/katana/productVariant";
+import type { ProductConfig } from "@my-inventory-app/shared";
 
 interface ConfigOptionsEditorProps {
-    configs: KatanaProductConfig[];
-    onChange: (updatedConfigs: KatanaProductConfig[]) => void;
+    configs: ProductConfig[];
+    onChange: (updatedConfigs: ProductConfig[]) => void;
 }
 
 export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorProps) => {
-    // New option section toggle & inputs
-    const [addingConfigOption, setAddingConfigOption] = useState(false);
-    const [newConfigName, setNewConfigName] = useState("");
-    const [newConfigValueInput, setNewConfigValueInput] = useState("");
+    // Inline new config option creation state
+    const [addingConfigOption, setAddingConfigOption] = useState<boolean>(false);
+    const [newConfigName, setNewConfigName] = useState<string>("");
+    const [newConfigValueInput, setNewConfigValueInput] = useState<string>("");
     const [newConfigValues, setNewConfigValues] = useState<string[]>([]);
 
     // Per-row input values for appending options to existing configs
@@ -29,7 +29,7 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
         const updated = configs.map((config, idx) => {
             if (idx !== configIndex) return config;
 
-            // Avoid duplicate value tags in the same config
+            // Avoid duplicate value tags within the same config
             if (config.values.includes(valToAppend)) return config;
 
             return {
@@ -40,7 +40,7 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
 
         onChange(updated);
 
-        // Reset input for this specific config row
+        // Reset text input for this specific config row
         setExistingValueInputs((prev) => ({ ...prev, [configIndex]: "" }));
     };
 
@@ -84,16 +84,17 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
     };
 
     const handleAddConfig = () => {
-        if (!newConfigName.trim() || newConfigValues.length === 0) return;
+        const trimmedName = newConfigName.trim();
+        if (!trimmedName || newConfigValues.length === 0) return;
 
-        const newConfigObj: KatanaProductConfig = {
-            name: newConfigName.trim(),
+        const newConfigObj: ProductConfig = {
+            name: trimmedName,
             values: newConfigValues,
         };
 
         onChange([...configs, newConfigObj]);
 
-        // Reset temporary input state
+        // Reset temporary state
         setNewConfigName("");
         setNewConfigValueInput("");
         setNewConfigValues([]);
@@ -124,7 +125,7 @@ export const ConfigOptionsEditor = ({ configs, onChange }: ConfigOptionsEditorPr
                         />
                     </div>
 
-                    {/* Interactive Input Box with Tags */}
+                    {/* Interactive Input Box with Badges */}
                     <div className="flex items-start justify-between gap-x-2 sm:col-span-2">
                         <div className="flex-1 flex flex-wrap items-center gap-1.5 min-h-9.5 p-1.5 rounded-md border border-input bg-background focus-within:ring-2 focus-within:ring-ring/30 transition-all">
                             {/* Render Existing Values as Badges */}

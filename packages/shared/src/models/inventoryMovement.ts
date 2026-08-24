@@ -8,7 +8,7 @@ export type InventoryMovement = {
     batchId: Batch["id"] | null
     adjustedAt: string
     locationId: number
-    referenceId: string;
+    referenceId: string | null;
     referenceType: "MANUFACTURE" | "SALES" | "ADJUSTMENT"
 }
 

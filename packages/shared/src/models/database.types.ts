@@ -165,7 +165,7 @@ export type Database = {
           id: number
           location_id: number
           quantity_adjusted: number
-          reference_id: string
+          reference_id: string | null
           reference_type: string
           variant_id: number
         }
@@ -175,7 +175,7 @@ export type Database = {
           id?: number
           location_id: number
           quantity_adjusted: number
-          reference_id: string
+          reference_id?: string | null
           reference_type: string
           variant_id: number
         }
@@ -185,7 +185,7 @@ export type Database = {
           id?: number
           location_id?: number
           quantity_adjusted?: number
-          reference_id?: string
+          reference_id?: string | null
           reference_type?: string
           variant_id?: number
         }

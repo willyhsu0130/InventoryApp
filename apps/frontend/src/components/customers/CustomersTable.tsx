@@ -1,21 +1,21 @@
 // src/components/customers/CustomersTable.tsx
-import type { KatanaCustomer } from "@/models/katana/customers"
+import type { FC } from "react";
+import type { Customer } from "@my-inventory-app/shared";
 import { DataTable, type Column } from "../DataTable";
-import { format } from "date-fns";
 
 interface CustomersTableProps {
-    items: KatanaCustomer[];
+    items: Customer[];
     /** Callback fired when clicking a customer row. */
     onRowClick?: (customerId: number) => void;
 }
 
-export const CustomersTable = ({ items, onRowClick }: CustomersTableProps) => {
-    const columns: Column<KatanaCustomer>[] = [
+export const CustomersTable: FC<CustomersTableProps> = ({ items, onRowClick }) => {
+    const columns: Column<Customer>[] = [
         {
             header: "客戶全名",
             render: (customer) => {
-                const name = `${customer.first_name ?? ""} ${customer.last_name ?? ""}`.trim();
-                const displayName = customer.name || name || "未命名客戶";
+                const fullName = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim();
+                const displayName = fullName || "未命名客戶";
 
                 return (
                     <div className="flex flex-col">
@@ -43,38 +43,34 @@ export const CustomersTable = ({ items, onRowClick }: CustomersTableProps) => {
             header: "電話",
             render: (customer) => (
                 <span className="text-slate-400 text-xs font-mono">
-                    {customer.phone || "—"}
+                    {customer.phoneNumber || "—"}
                 </span>
             ),
         },
         {
-            header: "預設幣別",
-            align: "center",
-            render: (customer) => (
-                <span className="inline-flex items-center rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-mono font-medium text-foreground">
-                    {customer.currency || "TWD"}
-                </span>
-            ),
+            header: "城市 / 國家",
+            render: (customer) => {
+                const parts = [customer.city, customer.country].filter(Boolean);
+                return (
+                    <span className="text-slate-400 text-xs font-sans">
+                        {parts.length > 0 ? parts.join(", ") : "—"}
+                    </span>
+                );
+            },
         },
         {
-            header: "折扣率",
-            align: "right",
-            render: (customer) => (
-                <span className="text-emerald-400 font-mono text-xs font-medium">
-                    {customer.discount_rate != null ? `${customer.discount_rate}%` : "—"}
-                </span>
-            ),
-        },
-        {
-            header: "建立時間",
-            align: "right",
-            render: (customer) => (
-                <span className="text-slate-500 text-xs font-mono">
-                    {customer.created_at
-                        ? format(new Date(customer.created_at), "yyyy/MM/dd")
-                        : "—"}
-                </span>
-            ),
+            header: "地址",
+            render: (customer) => {
+                const addressParts = [customer.line1, customer.line2, customer.state]
+                    .filter(Boolean)
+                    .join(" ");
+
+                return (
+                    <span className="text-slate-400 text-xs font-sans max-w-xs truncate block" title={addressParts || undefined}>
+                        {addressParts || "—"}
+                    </span>
+                );
+            },
         },
     ];
 

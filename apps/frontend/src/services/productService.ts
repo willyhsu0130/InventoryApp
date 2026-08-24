@@ -1,5 +1,5 @@
 // frontend/src/services/productService.ts
-import type { Product, ProductConfig, VariantConfigAttribute } from "@my-inventory-app/shared";
+import type { Product, ProductConfig } from "@my-inventory-app/shared";
 import { supabase, unwrap } from "@/lib/supabase";
 import type { Database } from "@my-inventory-app/shared";
 
@@ -22,42 +22,68 @@ function toProductDomain(row: ProductRow): Product {
 export async function createProduct(
     payload: Omit<Product, "id" | "isArchived">
 ): Promise<Product> {
-    // 1. Create the parent product
+    // 1. Insert parent product
     const productRow = await unwrap(
         supabase
             .from("products")
             .insert({
-                name: payload.name,
-                uom: payload.uom,
+                name: payload.name.trim(),
+                uom: payload.uom.trim(),
                 batch_tracked: payload.batchTracked,
-                configs: (payload.configs as ProductConfig[]) ?? [],
+                configs: payload.configs ?? [],
                 is_archived: false,
             })
             .select()
             .single()
     );
 
-    const product = toProductDomain(productRow);
+    const configs = payload.configs;
 
-    const defaultConfigs =
-        payload.configs && payload.configs.length > 0
-            ? payload.configs.map((c) => ({
-                name: c.name,
-                value: Array.isArray(c.value) ? c.value[0] : c.value,
-            }))
-            : [];
+    // 2. If NO configs, create exactly ONE default variant
+    if (configs.length === 0) {
+        await unwrap(
+            supabase.from("variants").insert({
+                product_id: productRow.id,
+                sku: null,
+                sales_price: 0,
+                configs: [],
+                is_archived: false,
+            }).select()
+                .single()
+        );
+    } else {
+        // Generate Cartesian product if configs exist
+        const generateCombinations = (
+            cfgList: ProductConfig[]
+        ): { name: string; value: string }[][] => {
+            if (cfgList.length === 0) return [[]];
+            const [first, ...rest] = cfgList;
+            const subCombinations = generateCombinations(rest);
+            const values = first.values ?? (first as ProductConfig).values;
+            return values.flatMap((val: string) =>
+                subCombinations.map((sub) => [{ name: first.name, value: val }, ...sub])
+            );
+        };
 
-    const { error: variantError } = await supabase.from("variants").insert({
-        product_id: product.id,
-        sku: null,
-        sales_price: 0,
-        configs: defaultConfigs as VariantConfigAttribute[],
-        is_archived: false,
-    });
+        const combinations = generateCombinations(configs);
 
-    if (variantError) throw variantError;
+        await unwrap(
+            supabase
+                .from("variants")
+                .insert(
+                    combinations.map((combo) => ({
+                        product_id: productRow.id,
+                        sku: null,
+                        sales_price: 0,
+                        configs: combo,
+                        is_archived: false,
+                    }))
+                )
+                .select()
+        );
+    }
 
-    return product;
+    return toProductDomain(productRow);
 }
 export async function getProductById(id: number): Promise<Product> {
     const row = await unwrap(
@@ -67,7 +93,6 @@ export async function getProductById(id: number): Promise<Product> {
             .eq("id", id)
             .single()
     );
-
     return toProductDomain(row);
 }
 
