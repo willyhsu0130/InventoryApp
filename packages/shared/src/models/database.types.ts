@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   graphql_public: {
     Tables: {
@@ -121,25 +121,28 @@ export type Database = {
       }
       inventory_levels: {
         Row: {
+          committed_quantity: number
           id: number
-          location_id: number | null
+          location_id: number
           quantity: number
           updated_at: string | null
-          variant_id: number | null
+          variant_id: number
         }
         Insert: {
+          committed_quantity?: number
           id?: number
-          location_id?: number | null
+          location_id: number
           quantity?: number
           updated_at?: string | null
-          variant_id?: number | null
+          variant_id: number
         }
         Update: {
+          committed_quantity?: number
           id?: number
-          location_id?: number | null
+          location_id?: number
           quantity?: number
           updated_at?: string | null
-          variant_id?: number | null
+          variant_id?: number
         }
         Relationships: [
           {
@@ -280,7 +283,9 @@ export type Database = {
         Row: {
           batch_id: number | null
           created_at: string
+          fulfilled_quantity: number
           id: number
+          notes: string | null
           price_per_unit: number
           quantity: number
           sales_order_id: number
@@ -289,7 +294,9 @@ export type Database = {
         Insert: {
           batch_id?: number | null
           created_at?: string
+          fulfilled_quantity?: number
           id?: number
+          notes?: string | null
           price_per_unit?: number
           quantity: number
           sales_order_id: number
@@ -298,7 +305,9 @@ export type Database = {
         Update: {
           batch_id?: number | null
           created_at?: string
+          fulfilled_quantity?: number
           id?: number
+          notes?: string | null
           price_per_unit?: number
           quantity?: number
           sales_order_id?: number
@@ -332,25 +341,34 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: number
+          expected_delivery_date: string | null
           id: number
           location_id: number
+          notes: string | null
           sales_order_status: string | null
+          shipping_location_id: number | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           customer_id: number
+          expected_delivery_date?: string | null
           id?: number
           location_id: number
+          notes?: string | null
           sales_order_status?: string | null
+          shipping_location_id?: number | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           customer_id?: number
+          expected_delivery_date?: string | null
           id?: number
           location_id?: number
+          notes?: string | null
           sales_order_status?: string | null
+          shipping_location_id?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -364,6 +382,13 @@ export type Database = {
           {
             foreignKeyName: "sales_orders_location_id_fkey"
             columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_orders_shipping_location_id_fkey"
+            columns: ["shipping_location_id"]
             isOneToOne: false
             referencedRelation: "locations"
             referencedColumns: ["id"]

@@ -20,24 +20,16 @@ function toVariantDomain(row: VariantRow): Variant {
     };
 }
 
-/**
- * Normalizes an array of VariantConfigAttribute items for deterministic comparison.
- */
-function normalizeConfigs(configs: VariantConfigAttribute[]): string {
-    if (!configs || configs.length === 0) return "";
+function normalizeConfigs(configs?: VariantConfigAttribute[] | null): Array<{ name: string; value: string }> {
+    if (!configs || !Array.isArray(configs)) return [];
     return configs
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(
-            (c) =>
-                `${c.name.trim().toLowerCase()}:${String(c.value).trim().toLowerCase()}`
-        )
-        .join("|");
+        .map((c) => ({
+            name: c.name.trim().toLowerCase(),
+            value: String(c.value).trim().toLowerCase(),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/**
- * Validates that all variant config attributes exist and have allowed values in the parent product configs
- */
 function validateVariantConfigsAgainstParent(
     parentConfigs: ProductConfig[],
     variantConfigs: VariantConfigAttribute[]
@@ -45,53 +37,54 @@ function validateVariantConfigsAgainstParent(
     if (!variantConfigs || variantConfigs.length === 0) return;
 
     for (const attr of variantConfigs) {
-        const parentDef = parentConfigs.find((pc) => pc.name === attr.name);
+        const parentDef = parentConfigs.find(
+            (pc) => pc.name.trim().toLowerCase() === attr.name.trim().toLowerCase()
+        );
         if (!parentDef) {
             throw new Error(
                 `Invalid variant config name: "${attr.name}" does not exist in parent product configs.`
             );
         }
 
-        const allowedValues = parentDef.values ?? (parentDef as ProductConfig).values ?? [];
-        if (!allowedValues.includes(attr.value)) {
+        const allowedValues = (parentDef.values ?? []).map((v) => String(v).trim().toLowerCase());
+        if (!allowedValues.includes(String(attr.value).trim().toLowerCase())) {
             throw new Error(
-                `Invalid variant config value: "${attr.value}" is not an allowed value for "${attr.name}". Allowed: [${allowedValues.join(", ")}]`
+                `Invalid variant config value: "${attr.value}" is not an allowed value for "${attr.name}". Allowed: [${parentDef.values?.join(", ")}]`
             );
         }
     }
 }
 
-/**
- * Checks if another active variant with the same configuration combination already exists.
- * Duplicate validation only triggers when candidate configs are non-empty.
- */
 async function assertNoDuplicateConfigs(
     productId: number,
-    candidateConfigs: VariantConfigAttribute[],
+    configs: VariantConfigAttribute[],
     excludeVariantId?: number
-) {
-    // Only check combinations if the variant actually has configs defined
-    if (!candidateConfigs || candidateConfigs.length === 0) {
-        return;
-    }
+): Promise<void> {
+    if (!configs || configs.length === 0) return;
 
-    const { data: existingVariants, error } = await supabase
+    let query = supabase
         .from("variants")
         .select("id, configs")
         .eq("product_id", productId)
         .eq("is_archived", false);
 
-    if (error) throw error;
+    if (excludeVariantId) {
+        query = query.neq("id", excludeVariantId);
+    }
 
-    const candidateNormalized = normalizeConfigs(candidateConfigs);
+    const existingVariants = await unwrap(query);
+    const incomingNormalized = normalizeConfigs(configs);
 
-    const isDuplicate = (existingVariants ?? [])
-        .filter((v) => v.id !== excludeVariantId)
-        .some((v) => {
-            const existingConfigs = (v.configs as unknown as VariantConfigAttribute[]) ?? [];
-            if (existingConfigs.length === 0) return false;
-            return normalizeConfigs(existingConfigs) === candidateNormalized;
-        });
+    const isDuplicate = existingVariants.some((v) => {
+        const existingNormalized = normalizeConfigs(v.configs as VariantConfigAttribute[]);
+        if (existingNormalized.length !== incomingNormalized.length) return false;
+
+        return incomingNormalized.every(
+            (inc, idx) =>
+                inc.name === existingNormalized[idx]?.name &&
+                inc.value === existingNormalized[idx]?.value
+        );
+    });
 
     if (isDuplicate) {
         throw new Error(
@@ -103,15 +96,16 @@ async function assertNoDuplicateConfigs(
 export async function createVariant(
     payload: Omit<Variant, "id" | "isArchived">
 ): Promise<Variant> {
-    // 1. Fetch parent product to validate configs (also asserts parent product exists)
+    if (!payload.productId || Number.isNaN(Number(payload.productId))) {
+        throw new Error("A valid productId is required to create a variant.");
+    }
+
     const parentProduct = await getProductById(payload.productId);
 
-    // 2. Validate configs against parent definition
     if (payload.configs && payload.configs.length > 0) {
         validateVariantConfigsAgainstParent(parentProduct.configs ?? [], payload.configs);
     }
 
-    // 3. Ensure no duplicate active variant exists with the same config combination
     await assertNoDuplicateConfigs(payload.productId, payload.configs ?? []);
 
     const row = await unwrap(
@@ -120,7 +114,7 @@ export async function createVariant(
             .insert({
                 product_id: payload.productId,
                 sku: payload.sku?.trim() || null,
-                sales_price: payload.salesPrice,
+                sales_price: payload.salesPrice ?? 0,
                 configs: (payload.configs as VariantConfigAttribute[]) ?? [],
                 is_archived: false,
             })
@@ -132,11 +126,15 @@ export async function createVariant(
 }
 
 export async function getVariantById(id: number): Promise<Variant> {
+    if (!id || Number.isNaN(Number(id))) {
+        throw new Error(`Invalid variant ID provided: ${id}`);
+    }
+
     const row = await unwrap(
         supabase
             .from("variants")
             .select("*")
-            .eq("id", id)
+            .eq("id", Number(id))
             .single()
     );
 
@@ -184,13 +182,16 @@ export async function updateVariant(
     id: number,
     payload: Partial<Omit<Variant, "id" | "productId">>
 ): Promise<Variant> {
+    if (!id || Number.isNaN(Number(id))) {
+        throw new Error(`Invalid variant ID provided for update: ${id}`);
+    }
+
     const updateData: Database["public"]["Tables"]["variants"]["Update"] = {};
 
     if (payload.sku !== undefined) updateData.sku = payload.sku?.trim() || null;
     if (payload.salesPrice !== undefined) updateData.sales_price = payload.salesPrice;
     if (payload.isArchived !== undefined) updateData.is_archived = payload.isArchived;
 
-    // Validate new configs if updating them
     if (payload.configs !== undefined) {
         const currentVariant = await getVariantById(id);
         const parentProduct = await getProductById(currentVariant.productId);
@@ -216,6 +217,10 @@ export async function updateVariant(
 }
 
 export async function deleteVariant(id: number): Promise<Variant> {
+    if (!id || Number.isNaN(Number(id))) {
+        throw new Error(`Invalid variant ID provided for deletion: ${id}`);
+    }
+
     const row = await unwrap(
         supabase
             .from("variants")

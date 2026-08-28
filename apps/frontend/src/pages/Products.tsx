@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ProductsTable } from "../components/products/ProductsTable";
-import { Plus } from "lucide-react";
+import { Plus, PackageOpen, SearchX } from "lucide-react";
 import { EditModal } from "../components/EditModal";
 import { EditProduct, type EditProductHandle } from "../components/products/EditProduct";
 import type { Product, Variant } from "@my-inventory-app/shared";
@@ -24,17 +24,14 @@ export interface DisplayProductRow {
 }
 
 async function loadCatalogRows(): Promise<DisplayProductRow[]> {
-    // 1. Fetch both active variants and products in parallel (2 total requests)
     const [variants, products] = await Promise.all([
         getActiveVariants(),
         getActiveProducts(),
     ]);
 
-    // 2. Build product lookup map for O(1) attribute resolution
     const productMap = new Map<number, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
-    // 3. Iterate over variants as the primary row entity
     return variants.map((variant: Variant): DisplayProductRow => {
         const parentProduct = productMap.get(variant.productId);
         const parentName = parentProduct?.name ?? "未命名產品";
@@ -74,7 +71,6 @@ export const Products = () => {
 
     const isCreating = selectedProductId === UNSAVED_PRODUCT_ID;
 
-    // Async loader for manual events (Refresh, Create, Delete)
     const refreshCatalog = useCallback(async () => {
         setIsLoading(true);
         setErrorMessage(null);
@@ -88,7 +84,6 @@ export const Products = () => {
         }
     }, []);
 
-    // Initial mount effect with cleanup flag
     useEffect(() => {
         let isMounted = true;
 
@@ -129,7 +124,7 @@ export const Products = () => {
     const handleCloseModal = () => {
         if (isSaving) return;
         setSelectedProductId(null);
-        refreshCatalog()
+        refreshCatalog();
     };
 
     const filteredProducts = useMemo(() => {
@@ -151,7 +146,7 @@ export const Products = () => {
             {/* Header & Search */}
             <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-black">產品目錄</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">產品目錄</h1>
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -179,10 +174,10 @@ export const Products = () => {
                 </div>
             </div>
 
-            {/* Content Table State */}
-            <div className="flex-1 w-full min-h-0" id="bottomContainer">
+            {/* Content Table / Empty State (Full-height Flex container) */}
+            <div className="flex-1 w-full min-h-0 flex flex-col" id="bottomContainer">
                 {isLoading ? (
-                    <div className="flex justify-center items-center h-48 text-slate-400">
+                    <div className="flex-1 flex justify-center items-center text-slate-400">
                         <p className="animate-pulse font-medium text-sm">
                             準備畫面中...
                         </p>
@@ -191,6 +186,40 @@ export const Products = () => {
                     <div className="p-4 bg-red-950/40 border border-red-500/40 rounded-lg text-red-200 text-sm">
                         <p className="font-semibold">無法讀取產品目錄</p>
                         <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
+                    </div>
+                ) : rows.length === 0 ? (
+                    /* Full-Height Entire Catalog Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
+                        <div className="p-4 bg-slate-800/80 rounded-full mb-4 text-slate-400">
+                            <PackageOpen className="w-10 h-10" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground">目前尚無任何產品</h3>
+                        <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
+                            建立您的第一項產品以開始管理規格、款式及庫存追蹤。
+                        </p>
+                        <Button
+                            type="button"
+                            size="lg"
+                            onClick={handleCreateProduct}
+                            className="mt-6 gap-2"
+                        >
+                            <Plus className="w-5 h-5" />
+                            新增產品
+                        </Button>
+                    </div>
+                ) : filteredProducts.length === 0 ? (
+                    /* Full-Height Search Filter Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-slate-800 rounded-xl p-8 text-center">
+                        <SearchX className="w-10 h-10 text-muted-foreground mb-3" />
+                        <p className="text-base font-medium text-foreground">找不到符合「{searchTerm}」的產品</p>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => setSearchTerm("")}
+                            className="mt-2 text-primary"
+                        >
+                            清除搜尋條件
+                        </Button>
                     </div>
                 ) : (
                     <ProductsTable

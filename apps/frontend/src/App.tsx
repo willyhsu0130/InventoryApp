@@ -8,7 +8,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Orders } from "./pages/Orders";
 import { Inventory } from "./pages/Inventory";
 import { InventoryBatches } from "./pages/InventoryBatches";
-import { Manufacture } from "./pages/Manufacture";
+// import { Manufacture } from "./pages/Manufacture";
 import { Settings } from "./pages/Settings";
 import { Products } from "./pages/Products";
 import { Customers } from "./pages/Customers";
@@ -35,12 +35,6 @@ const appProviders: Array<ComponentType<{ children: ReactNode }>> = [
   TooltipProvider,
   ErrorProvider,
   AuthProvider,
-  // CustomersProvider,
-  // ManufactureProvider,
-  // InventoryProvider,
-  // ProductProvider,
-  // VariantProvider,
-  // OrdersProvider,
 ];
 
 export default function App() {
@@ -57,7 +51,7 @@ export default function App() {
               <Route path="/orders" element={<Orders />} />
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/inventory/batches" element={<InventoryBatches />} />
-              <Route path="/manufacture" element={<Manufacture />} />
+              {/* <Route path="/manufacture" element={<Manufacture />} /> */}
               <Route path="/settings" element={<Settings />} />
               <Route path="/products" element={<Products />} />
               <Route path="/customers" element={<Customers />} />

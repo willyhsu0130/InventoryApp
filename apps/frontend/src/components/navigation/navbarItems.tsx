@@ -2,7 +2,7 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Boxes,
-  Factory,
+  // Factory,
   Settings,
   User,
   Fish,
@@ -31,11 +31,11 @@ export const navbarItems: NavbarItem[] = [
     link: "/inventory",
     text: "庫存",
   },
-  {
-    icon: Factory,
-    link: "/manufacture",
-    text: "製造",
-  },
+  // {
+  //   icon: Factory,
+  //   link: "/manufacture",
+  //   text: "製造",
+  // },
   {
     icon: Fish,
     link: "/products",

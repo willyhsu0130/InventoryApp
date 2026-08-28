@@ -2,6 +2,7 @@ import { supabase, unwrap } from "@/lib/supabase";
 import type { InventoryMovement, Database } from "@my-inventory-app/shared";
 import { getVariantById } from "./variantService";
 import { getProductById } from "./productService";
+import { getBatchById } from "./batchService";
 
 type InventoryMovementRow = Database["public"]["Tables"]["inventory_movements"]["Row"];
 
@@ -27,12 +28,11 @@ function toInventoryMovementDomain(row: InventoryMovementRow): InventoryMovement
 export async function createInventoryMovement(
     payload: Omit<InventoryMovement, "id" | "adjustedAt">
 ): Promise<InventoryMovement> {
-    // 1. Invariant: Disallow zero-quantity adjustments
+
     if (payload.quantityAdjusted === 0) {
         throw new Error("quantityAdjusted must be a non-zero value.");
     }
 
-    // 2. Invariant: Validate referenceType enum
     if (!ALLOWED_REFERENCE_TYPES.includes(payload.referenceType)) {
         throw new Error(
             `Invalid referenceType: "${payload.referenceType}". Must be one of: ${ALLOWED_REFERENCE_TYPES.join(", ")}`
@@ -52,16 +52,13 @@ export async function createInventoryMovement(
             );
         }
 
-        // Fetch the batch record to ensure it exists and belongs to this variant
-        const batchRow = await unwrap(
-            supabase
-                .from("batches")
-                .select("id, variant_id")
-                .eq("id", payload.batchId)
-                .single()
-        );
+        // Fetch the specific batch directly by ID
+        const batch = await getBatchById(payload.batchId);
+        if (!batch) {
+            throw new Error(`Batch with ID ${payload.batchId} does not exist.`);
+        }
 
-        if (batchRow.variant_id !== payload.variantId) {
+        if (batch.variantId !== payload.variantId) {
             throw new Error(
                 `Batch with ID ${payload.batchId} does not belong to variant ID ${payload.variantId}.`
             );

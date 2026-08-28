@@ -35,6 +35,7 @@ export type {
     SalesOrderItem,
     SalesOrder,
     CreateSalesOrderPayload,
+    SalesOrderStatus
 } from "./models/salesOrder";
 
 export * from "./models/database.types";

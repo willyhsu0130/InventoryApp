@@ -4,7 +4,7 @@
     "composite": true,
     "rootDir": "./src",
     "outDir": "./dist",
-    //@ignoreDeprecations
+    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
       "@/*": [

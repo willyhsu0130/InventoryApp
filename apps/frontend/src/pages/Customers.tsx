@@ -1,12 +1,11 @@
 // src/pages/Customers.tsx
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus, SearchX } from "lucide-react";
 import { PageLayout } from "../components/PageLayout";
 import { CustomersTable } from "@/components/customers/CustomersTable";
 import {
     CONTROL_INPUT,
     ERROR_PANEL,
-    PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
 } from "../lib/styles";
 import { EditModal } from "@/components/EditModal";
@@ -85,7 +84,6 @@ export const Customers = () => {
         await refreshCustomers();
     };
 
-    // Filter across Name, Company, Email, Phone, and City
     const filteredItems = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
         if (!term) return customers;
@@ -116,42 +114,82 @@ export const Customers = () => {
             id="customersPage"
             title="客戶管理"
             actions={
-                <>
-                    <Button
-                        onClick={() => setCustomerTarget({ customerId: UNSAVED_CUSTOMER_ID })}
-                        className={PRIMARY_BUTTON}
-                    >
-                        <Plus width="14" height="14" />
-                        新增客戶
-                    </Button>
+                customers.length > 0 ? (
+                    <>
+                        <Button
+                            onClick={() => setCustomerTarget({ customerId: UNSAVED_CUSTOMER_ID })}
+                            className={PRIMARY_BUTTON}
+                        >
+                            <Plus width="14" height="14" />
+                            新增客戶
+                        </Button>
 
-                    <RefreshButton label="重新整理客戶" onClick={refreshCustomers} />
+                        <RefreshButton label="重新整理客戶" onClick={refreshCustomers} />
 
-                    <div className="w-full sm:w-80">
-                        <input
-                            type="text"
-                            placeholder="搜尋客戶姓名, 公司, 信箱, 或電話..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className={CONTROL_INPUT}
-                        />
-                    </div>
-                </>
+                        <div className="w-full sm:w-80">
+                            <input
+                                type="text"
+                                placeholder="搜尋客戶姓名, 公司, 信箱, 或電話..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className={CONTROL_INPUT}
+                            />
+                        </div>
+                    </>
+                ) : undefined
             }
         >
-            {isLoading ? (
-                <div className={PLACEHOLDER_PANEL}>準備畫面中...</div>
-            ) : errorMessage ? (
-                <div className={ERROR_PANEL}>
-                    <p className="font-semibold">無法讀取客戶資料</p>
-                    <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
-                </div>
-            ) : (
-                <CustomersTable
-                    items={filteredItems}
-                    onRowClick={(customerId) => setCustomerTarget({ customerId })}
-                />
-            )}
+            <div className="flex-1 w-full min-h-0 flex flex-col">
+                {isLoading ? (
+                    <div className="flex-1 flex justify-center items-center text-muted-foreground">
+                        <p className="animate-pulse font-medium text-sm">準備畫面中...</p>
+                    </div>
+                ) : errorMessage ? (
+                    <div className={ERROR_PANEL}>
+                        <p className="font-semibold">無法讀取客戶資料</p>
+                        <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
+                    </div>
+                ) : customers.length === 0 ? (
+                    /* Full-Height Clean White/Background Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-border rounded-xl p-8 text-center bg-background">
+                        <div className="p-4 bg-muted rounded-full mb-4 text-muted-foreground">
+                            <UserPlus className="w-10 h-10 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground">目前尚無任何客戶資料</h3>
+                        <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
+                            建立您的第一位客戶資料以開始管理銷售訂單、聯絡地址與出貨資訊。
+                        </p>
+                        <Button
+                            type="button"
+                            size="lg"
+                            onClick={() => setCustomerTarget({ customerId: UNSAVED_CUSTOMER_ID })}
+                            className="mt-6 gap-2"
+                        >
+                            <Plus className="w-5 h-5" />
+                            新增客戶
+                        </Button>
+                    </div>
+                ) : filteredItems.length === 0 ? (
+                    /* Full-Height Clean White/Background Search Filter Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-border rounded-xl p-8 text-center bg-background">
+                        <SearchX className="w-10 h-10 text-muted-foreground mb-3" />
+                        <p className="text-base font-medium text-foreground">找不到符合「{searchTerm}」的客戶</p>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => setSearchTerm("")}
+                            className="mt-2 text-primary"
+                        >
+                            清除搜尋條件
+                        </Button>
+                    </div>
+                ) : (
+                    <CustomersTable
+                        items={filteredItems}
+                        onRowClick={(customerId) => setCustomerTarget({ customerId })}
+                    />
+                )}
+            </div>
 
             <EditModal
                 showSaveButton={true}

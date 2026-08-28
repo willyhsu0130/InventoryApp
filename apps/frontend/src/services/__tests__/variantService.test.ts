@@ -1,3 +1,4 @@
+// src/services/__tests__/variantService.test.ts
 import { describe, it, expect, afterAll, beforeAll } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
@@ -47,6 +48,9 @@ describe("Variant Service", () => {
         });
         createdProductIds.push(baseProduct.id);
 
+        // Delete any auto-generated default variant for baseProduct so tests start with a clean slate
+        await supabase.from("variants").delete().eq("product_id", baseProduct.id);
+
         // 2. Create a parent product with configs
         const configs: ProductConfig[] = [
             { name: "Grind Size", values: ["Fine", "Medium", "Coarse"] },
@@ -60,6 +64,9 @@ describe("Variant Service", () => {
             configs,
         });
         createdProductIds.push(configuredProduct.id);
+
+        // Delete auto-generated permutation variants so manual createVariant tests don't collide
+        await supabase.from("variants").delete().eq("product_id", configuredProduct.id);
     });
 
     afterAll(async () => {
@@ -72,8 +79,13 @@ describe("Variant Service", () => {
             if (varError) console.error("Variants cleanup failed:", varError);
         }
 
-        // Clean up parent products
+        // Clean up parent products and any remaining child variants
         if (createdProductIds.length > 0) {
+            await supabase
+                .from("variants")
+                .delete()
+                .in("product_id", createdProductIds);
+
             const { error: prodError } = await supabase
                 .from("products")
                 .delete()
@@ -130,7 +142,7 @@ describe("Variant Service", () => {
             expect(variant.isArchived).toBe(false);
 
             createdVariantIds.push(variant.id);
-            configuredVariantId = variant.id; // <-- 1. Capture configured variant ID here
+            configuredVariantId = variant.id;
         });
 
         it("PATCH: updates primitive fields (sku, salesPrice)", async () => {
@@ -148,9 +160,9 @@ describe("Variant Service", () => {
         it("PATCH: updates configs array", async () => {
             const newConfigs: VariantConfigAttribute[] = [
                 { name: "Grind Size", value: "Coarse" },
+                { name: "Roast Level", value: "Light" },
             ];
 
-            // 2. Use configuredVariantId here
             const updated = await updateVariant(configuredVariantId, {
                 configs: newConfigs,
             });
@@ -159,7 +171,6 @@ describe("Variant Service", () => {
         });
 
         it("PATCH: resets configs array to empty", async () => {
-            // 3. Use configuredVariantId here
             const updated = await updateVariant(configuredVariantId, {
                 configs: [],
             });
@@ -222,6 +233,9 @@ describe("Variant Service", () => {
                 configs: [],
             });
             createdProductIds.push(cascadeProduct.id);
+
+            // Clean auto-generated default variant
+            await supabase.from("variants").delete().eq("product_id", cascadeProduct.id);
 
             const childVariant = await createVariant({
                 productId: cascadeProduct.id,
@@ -298,7 +312,7 @@ describe("Variant Service", () => {
     });
 
     // ==========================================
-    // CONFIG & ATTRIBUTE INTEGRITY RULES
+    // 4. CONFIG & ATTRIBUTE INTEGRITY RULES
     // ==========================================
     describe("Config & Attribute Validation Rules", () => {
         it("POST: fails when variant config attribute name does not exist in parent product configs", async () => {
@@ -325,9 +339,10 @@ describe("Variant Service", () => {
         });
 
         it("POST: fails when creating duplicate active variants with identical config combinations", async () => {
+            // Use unique config values dedicated to this duplicate test
             const identicalConfigs: VariantConfigAttribute[] = [
-                { name: "Grind Size", value: "Fine" },
-                { name: "Roast Level", value: "Dark" },
+                { name: "Grind Size", value: "Medium" },
+                { name: "Roast Level", value: "Light" },
             ];
 
             // 1. First insert must succeed
@@ -351,10 +366,10 @@ describe("Variant Service", () => {
         });
 
         it("POST: rejects duplicate active variants with permuted/reversed config attribute order", async () => {
-            // Reversed array order: Roast Level first, Grind Size second (matching SKU-COMBO-1)
+            // Reversed array order: Roast Level first, Grind Size second (matching Medium / Light)
             const permutedConfigs: VariantConfigAttribute[] = [
-                { name: "Roast Level", value: "Dark" },
-                { name: "Grind Size", value: "Fine" },
+                { name: "Roast Level", value: "Light" },
+                { name: "Grind Size", value: "Medium" },
             ];
 
             await expect(
@@ -369,7 +384,7 @@ describe("Variant Service", () => {
 
         it("POST: allows creating a variant on the SAME product if at least one config value differs", async () => {
             const distinctConfigs: VariantConfigAttribute[] = [
-                { name: "Grind Size", value: "Coarse" }, // Different value
+                { name: "Grind Size", value: "Coarse" },
                 { name: "Roast Level", value: "Dark" },
             ];
 
@@ -386,7 +401,6 @@ describe("Variant Service", () => {
         });
 
         it("POST: allows the exact same config combination on a DIFFERENT product", async () => {
-            // Same configs as configuredProduct, but assigned to baseProduct
             const secondConfigProduct = await createProduct({
                 name: `Second Config Product ${Date.now()}`,
                 uom: "bags",
@@ -397,6 +411,9 @@ describe("Variant Service", () => {
                 ],
             });
             createdProductIds.push(secondConfigProduct.id);
+
+            // Clean auto-generated variants on this second product
+            await supabase.from("variants").delete().eq("product_id", secondConfigProduct.id);
 
             const variant = await createVariant({
                 productId: secondConfigProduct.id,
