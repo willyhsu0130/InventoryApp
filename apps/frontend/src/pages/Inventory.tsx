@@ -149,34 +149,34 @@ export const Inventory = () => {
             title="庫存"
             subnav={<InventorySectionNav />}
             actions={
-                items.length > 0 ? (
-                    <>
-                        <Button
-                            onClick={() => setAdjustmentTarget({ variantId: null })}
-                            className={PRIMARY_BUTTON}
-                        >
-                            <Plus width="14" height="14" />
-                            調整庫存
-                        </Button>
+                <>
+                    <Button
+                        onClick={() => setAdjustmentTarget({ variantId: null })}
+                        className={PRIMARY_BUTTON}
+                        disabled={items.length === 0}
+                    >
+                        <Plus width="14" height="14" />
+                        調整庫存
+                    </Button>
 
-                        <RefreshButton label="重新整理庫存" onClick={refreshInventory} />
+                    <RefreshButton label="重新整理庫存" onClick={refreshInventory} />
 
-                        <div className="w-full sm:w-80">
-                            <input
-                                type="text"
-                                placeholder="搜尋產品, SKU, 樣式, 或 ID..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={CONTROL_INPUT}
-                            />
-                        </div>
-                    </>
-                ) : undefined
+                    <div className="w-full sm:w-80">
+                        <input
+                            type="text"
+                            placeholder="搜尋產品, SKU, 樣式, 或 ID..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={CONTROL_INPUT}
+                            disabled={items.length === 0}
+                        />
+                    </div>
+                </>
             }
         >
             <div className="flex-1 w-full min-h-0 flex flex-col">
                 {isLoading ? (
-                    <div className="flex-1 flex justify-center items-center text-slate-400">
+                    <div className="flex-1 flex justify-center items-center text-muted-foreground">
                         <p className="animate-pulse font-medium text-sm">準備畫面中...</p>
                     </div>
                 ) : errorMessage ? (
@@ -185,8 +185,9 @@ export const Inventory = () => {
                         <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
                     </div>
                 ) : items.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-xl p-8 text-center bg-slate-900/20">
-                        <div className="p-4 bg-slate-800/80 rounded-full mb-4 text-slate-400">
+                    /* Full-Height Clean White/Background Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-border rounded-xl p-8 text-center bg-background">
+                        <div className="p-4 bg-muted rounded-full mb-4 text-muted-foreground">
                             <PackagePlus className="w-10 h-10 text-primary" />
                         </div>
                         <h3 className="text-lg font-semibold text-foreground">目前尚無庫存品項</h3>
@@ -204,7 +205,8 @@ export const Inventory = () => {
                         </Button>
                     </div>
                 ) : filteredItems.length === 0 ? (
-                    <div className="flex-1 flex flex-col items-center justify-center border border-slate-800 rounded-xl p-8 text-center">
+                    /* Full-Height Clean White/Background Search Filter Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-border rounded-xl p-8 text-center bg-background">
                         <SearchX className="w-10 h-10 text-muted-foreground mb-3" />
                         <p className="text-base font-medium text-foreground">找不到符合「{searchTerm}」的庫存品項</p>
                         <Button

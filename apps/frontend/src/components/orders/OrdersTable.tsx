@@ -2,6 +2,7 @@
 import type { FC } from "react";
 import { DataTable, type Column } from "../DataTable";
 import { format } from "date-fns";
+import type { SalesOrderStatus } from "@my-inventory-app/shared";
 
 export interface DisplaySalesOrderItem {
     variantId: number;
@@ -18,7 +19,7 @@ export interface DisplaySalesOrderRow {
     customerName: string;
     locationId: number;
     locationName: string;
-    status: "PENDING" | "COMPLETED";
+    status: SalesOrderStatus;
     totalQuantity: number;
     totalPrice: number;
     createdAt: string;

@@ -1,12 +1,11 @@
 // src/pages/Orders.tsx
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ShoppingCart, SearchX } from "lucide-react";
 import { PageLayout } from "../components/PageLayout";
 import { OrdersTable, type DisplaySalesOrderItem, type DisplaySalesOrderRow } from "@/components/orders/OrdersTable";
 import {
     CONTROL_INPUT,
     ERROR_PANEL,
-    PLACEHOLDER_PANEL,
     PRIMARY_BUTTON,
 } from "../lib/styles";
 import { EditModal } from "@/components/EditModal";
@@ -29,7 +28,6 @@ const UNSAVED_ORDER_ID = -1;
 type OrderTarget = { orderId: number } | null;
 
 async function loadSalesOrdersCatalog(): Promise<DisplaySalesOrderRow[]> {
-    // 1. Fetch pending & completed orders alongside entity metadata in parallel
     const [
         pendingOrders,
         completedOrders,
@@ -50,7 +48,6 @@ async function loadSalesOrdersCatalog(): Promise<DisplaySalesOrderRow[]> {
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    // 2. Build fast O(1) lookup maps
     const customerMap = new Map<number, Customer>();
     customers.forEach((c) => customerMap.set(c.id, c));
 
@@ -63,7 +60,6 @@ async function loadSalesOrdersCatalog(): Promise<DisplaySalesOrderRow[]> {
     const productMap = new Map<number, Product>();
     products.forEach((p) => productMap.set(p.id, p));
 
-    // 3. Hydrate display rows
     return allOrders.map((order: SalesOrder): DisplaySalesOrderRow => {
         const customer = customerMap.get(order.customerId);
         const customerName = customer
@@ -73,7 +69,6 @@ async function loadSalesOrdersCatalog(): Promise<DisplaySalesOrderRow[]> {
         const location = locationMap.get(order.locationId);
         const locationName = location?.name ?? `倉庫 #${order.locationId}`;
 
-        // Compute total quantity and price from line items
         let totalQuantity = 0;
         let totalPrice = 0;
 
@@ -161,7 +156,6 @@ export const Orders = () => {
         };
     }, []);
 
-    // Filter across Order ID, Customer Name, Status, and nested item descriptions
     const filteredOrders = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
         if (!term) return orders;
@@ -174,7 +168,6 @@ export const Orders = () => {
             const statusMatch = order.status.toLowerCase().includes(term);
             const locationMatch = order.locationName.toLowerCase().includes(term);
 
-            // Search through the hydrated variant details on each line item
             const itemsMatch = order.items.some((item: DisplaySalesOrderItem) =>
                 item.productName.toLowerCase().includes(term) ||
                 item.sku.toLowerCase().includes(term) ||
@@ -184,6 +177,7 @@ export const Orders = () => {
             return idMatch || customerMatch || statusMatch || locationMatch || itemsMatch;
         });
     }, [orders, searchTerm]);
+
     const handleCloseModal = async () => {
         if (isSaving) return;
         setOrderTarget(null);
@@ -240,19 +234,57 @@ export const Orders = () => {
                 </>
             }
         >
-            {isLoading ? (
-                <div className={PLACEHOLDER_PANEL}>準備畫面中...</div>
-            ) : errorMessage ? (
-                <div className={ERROR_PANEL}>
-                    <p className="font-semibold">無法讀取訂單</p>
-                    <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
-                </div>
-            ) : (
-                <OrdersTable
-                    items={filteredOrders}
-                    onRowClick={(orderId) => setOrderTarget({ orderId })}
-                />
-            )}
+            <div className="flex-1 w-full min-h-0 flex flex-col">
+                {isLoading ? (
+                    <div className="flex-1 flex justify-center items-center text-muted-foreground">
+                        <p className="animate-pulse font-medium text-sm">準備畫面中...</p>
+                    </div>
+                ) : errorMessage ? (
+                    <div className={ERROR_PANEL}>
+                        <p className="font-semibold">無法讀取訂單</p>
+                        <p className="text-xs font-mono mt-1 text-red-300">{errorMessage}</p>
+                    </div>
+                ) : orders.length === 0 ? (
+                    /* Full-Height Clean White/Background Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-border rounded-xl p-8 text-center bg-background">
+                        <div className="p-4 bg-muted rounded-full mb-4 text-muted-foreground">
+                            <ShoppingCart className="w-10 h-10 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground">目前尚無任何銷售訂單</h3>
+                        <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
+                            建立您的第一筆銷售訂單以指派庫存出貨倉、批次分配與送達地點。
+                        </p>
+                        <Button
+                            type="button"
+                            size="lg"
+                            onClick={() => setOrderTarget({ orderId: UNSAVED_ORDER_ID })}
+                            className="mt-6 gap-2"
+                        >
+                            <Plus className="w-5 h-5" />
+                            新增訂單
+                        </Button>
+                    </div>
+                ) : filteredOrders.length === 0 ? (
+                    /* Full-Height Clean White/Background Search Filter Empty State */
+                    <div className="flex-1 flex flex-col items-center justify-center border border-border rounded-xl p-8 text-center bg-background">
+                        <SearchX className="w-10 h-10 text-muted-foreground mb-3" />
+                        <p className="text-base font-medium text-foreground">找不到符合「{searchTerm}」的訂單</p>
+                        <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => setSearchTerm("")}
+                            className="mt-2 text-primary"
+                        >
+                            清除搜尋條件
+                        </Button>
+                    </div>
+                ) : (
+                    <OrdersTable
+                        items={filteredOrders}
+                        onRowClick={(orderId) => setOrderTarget({ orderId })}
+                    />
+                )}
+            </div>
 
             <EditModal
                 showSaveButton={orderTarget?.orderId === UNSAVED_ORDER_ID}

@@ -235,8 +235,8 @@ export const Dashboard: FC = () => {
                     })}
                 </div>
 
-                {/* Tables Overview */}
-                <div className="grid gap-6 xl:grid-cols-2">
+                {/* Tables Overview - Vertically Stacked */}
+                <div className="flex flex-col gap-6">
                     <DashboardSection
                         title="訂單總覽"
                         description="最近建立的銷售訂單"
@@ -272,7 +272,7 @@ const DashboardSection: FC<DashboardSectionProps> = ({
     children,
 }) => {
     return (
-        <Card className="flex h-128 min-w-0 flex-col overflow-hidden">
+        <Card className="flex min-w-0 flex-col overflow-hidden">
             <CardHeader className="flex-row items-start justify-between gap-4 border-b border-border/40 pb-4">
                 <div className="space-y-1">
                     <CardTitle className="text-base text-foreground">{title}</CardTitle>
@@ -286,7 +286,7 @@ const DashboardSection: FC<DashboardSectionProps> = ({
                     <ArrowUpRight className="h-3.5 w-3.5" />
                 </Link>
             </CardHeader>
-            <CardContent className="min-h-0 min-w-0 flex-1 overflow-hidden p-0">
+            <CardContent className="min-h-0 min-w-0 flex-1 overflow-x-auto p-0">
                 {children}
             </CardContent>
         </Card>

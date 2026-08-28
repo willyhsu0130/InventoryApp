@@ -114,29 +114,27 @@ export const Customers = () => {
             id="customersPage"
             title="客戶管理"
             actions={
-                customers.length > 0 ? (
-                    <>
-                        <Button
-                            onClick={() => setCustomerTarget({ customerId: UNSAVED_CUSTOMER_ID })}
-                            className={PRIMARY_BUTTON}
-                        >
-                            <Plus width="14" height="14" />
-                            新增客戶
-                        </Button>
+                <>
+                    <Button
+                        onClick={() => setCustomerTarget({ customerId: UNSAVED_CUSTOMER_ID })}
+                        className={PRIMARY_BUTTON}
+                    >
+                        <Plus width="14" height="14" />
+                        新增客戶
+                    </Button>
 
-                        <RefreshButton label="重新整理客戶" onClick={refreshCustomers} />
+                    <RefreshButton label="重新整理客戶" onClick={refreshCustomers} />
 
-                        <div className="w-full sm:w-80">
-                            <input
-                                type="text"
-                                placeholder="搜尋客戶姓名, 公司, 信箱, 或電話..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className={CONTROL_INPUT}
-                            />
-                        </div>
-                    </>
-                ) : undefined
+                    <div className="w-full sm:w-80">
+                        <input
+                            type="text"
+                            placeholder="搜尋客戶姓名, 公司, 信箱, 或電話..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className={CONTROL_INPUT}
+                        />
+                    </div>
+                </>
             }
         >
             <div className="flex-1 w-full min-h-0 flex flex-col">
