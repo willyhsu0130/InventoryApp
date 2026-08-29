@@ -1,7 +1,7 @@
-import { Batch } from "./batch";
-import { Customer } from "./customer";
-import { Variant } from "./variant";
-import { Location } from "./location";
+import type { Batch } from "./batch";
+import type{ Customer } from "./customer";
+import type{ Variant } from "./variant";
+import type{ Location } from "./location";
 
 export type SalesOrderStatus = "PENDING" | "COMPLETED" | "CANCELLED";
 

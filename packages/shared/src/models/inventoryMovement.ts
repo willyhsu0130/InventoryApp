@@ -1,5 +1,5 @@
-import { Batch } from "./batch"
-import { Variant } from "./variant"
+import type{ Batch } from "./batch"
+import type{ Variant } from "./variant"
 
 export type InventoryMovement = {
     id: number
