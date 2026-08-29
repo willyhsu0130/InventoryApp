@@ -1,503 +1,503 @@
-import type {
-    KatanaSalesOrder,
-    KatanaSalesOrderRow,
-    EnrichedSalesOrder,
-    EnrichedSalesOrderRow,
-    KatanaSalesOrderStatus,
-} from "@/models/katana/salesOrder";
-import type { ResolvedVariantInfo } from "@/models/katana/productVariant";
-import { katanaFetch } from "@/lib/katanaFetch";
-// ASSUMPTION: adjust this to wherever KATANA_API_ROUTES actually lives.
-import { KATANA_API_ROUTES } from "@/lib/routes/routes";
-import type { KatanaLocation } from "@/models/katana/common";
+// import type {
+//     KatanaSalesOrder,
+//     KatanaSalesOrderRow,
+//     EnrichedSalesOrder,
+//     EnrichedSalesOrderRow,
+//     KatanaSalesOrderStatus,
+// } from "@";
+// import type { ResolvedVariantInfo } from "@/models/katana/productVariant";
+// import { katanaFetch } from "@/lib/katanaFetch";
+// // ASSUMPTION: adjust this to wherever KATANA_API_ROUTES actually lives.
+// import { KATANA_API_ROUTES } from "@/lib/routes/routes";
+// import type { KatanaLocation } from "@/models/katana/common";
 
-export type ExportSalesOrderData = KatanaSalesOrder & {
-    customer_name?: string;
-    resolved_variant_map?: Map<number, ResolvedVariantInfo>;
-};
+// export type ExportSalesOrderData = KatanaSalesOrder & {
+//     customer_name?: string;
+//     resolved_variant_map?: Map<number, ResolvedVariantInfo>;
+// };
 
-/**
- * Traditional Chinese labels for Katana Sales Order status values
- */
-export const STATUS_LABELS_ZH: Record<KatanaSalesOrderStatus, string> = {
-    NOT_SHIPPED: "未出貨",
-    PENDING: "待處理",
-    PARTIALLY_PACKED: "部分包裝",
-    PACKED: "已包裝",
-    PARTIALLY_DELIVERED: "部分交貨",
-    DELIVERED: "已交貨",
-    CANCELLED: "已取消",
-};
+// /**
+//  * Traditional Chinese labels for Katana Sales Order status values
+//  */
+// export const STATUS_LABELS_ZH: Record<KatanaSalesOrderStatus, string> = {
+//     NOT_SHIPPED: "未出貨",
+//     PENDING: "待處理",
+//     PARTIALLY_PACKED: "部分包裝",
+//     PACKED: "已包裝",
+//     PARTIALLY_DELIVERED: "部分交貨",
+//     DELIVERED: "已交貨",
+//     CANCELLED: "已取消",
+// };
 
-/**
- * Formats status codes into Traditional Chinese
- */
-export const formatOrderStatusZh = (status?: KatanaSalesOrderStatus | string): string => {
-    if (!status) return "-";
-    return STATUS_LABELS_ZH[status as KatanaSalesOrderStatus] || status;
-};
+// /**
+//  * Formats status codes into Traditional Chinese
+//  */
+// export const formatOrderStatusZh = (status?: KatanaSalesOrderStatus | string): string => {
+//     if (!status) return "-";
+//     return STATUS_LABELS_ZH[status as KatanaSalesOrderStatus] || status;
+// };
 
-/**
- * Type guard to check if a row is an EnrichedSalesOrderRow
- */
-const isEnrichedRow = (
-    row: KatanaSalesOrderRow | EnrichedSalesOrderRow
-): row is EnrichedSalesOrderRow => {
-    return "product_name" in row && typeof (row as EnrichedSalesOrderRow).product_name === "string";
-};
+// /**
+//  * Type guard to check if a row is an EnrichedSalesOrderRow
+//  */
+// const isEnrichedRow = (
+//     row: KatanaSalesOrderRow | EnrichedSalesOrderRow
+// ): row is EnrichedSalesOrderRow => {
+//     return "product_name" in row && typeof (row as EnrichedSalesOrderRow).product_name === "string";
+// };
 
-/**
- * Helper to extract variant display text and SKU from a row using provider maps or enriched rows
- */
-const getRowVariantMeta = (
-    row: KatanaSalesOrderRow | EnrichedSalesOrderRow,
-    variantMap?: Map<number, ResolvedVariantInfo>,
-    getVariantDetailsFn?: (variantId: number) => ResolvedVariantInfo
-): { title: string; sku: string } => {
-    // 1. EnrichedSalesOrderRow check
-    if (isEnrichedRow(row)) {
-        const details = row.variant_details ? ` (${row.variant_details})` : "";
-        return {
-            title: `${row.product_name}${details}`,
-            sku: row.sku || "-",
-        };
-    }
+// /**
+//  * Helper to extract variant display text and SKU from a row using provider maps or enriched rows
+//  */
+// const getRowVariantMeta = (
+//     row: KatanaSalesOrderRow | EnrichedSalesOrderRow,
+//     variantMap?: Map<number, ResolvedVariantInfo>,
+//     getVariantDetailsFn?: (variantId: number) => ResolvedVariantInfo
+// ): { title: string; sku: string } => {
+//     // 1. EnrichedSalesOrderRow check
+//     if (isEnrichedRow(row)) {
+//         const details = row.variant_details ? ` (${row.variant_details})` : "";
+//         return {
+//             title: `${row.product_name}${details}`,
+//             sku: row.sku || "-",
+//         };
+//     }
 
-    // 2. Resolver function passed from hook
-    if (getVariantDetailsFn) {
-        const info = getVariantDetailsFn(row.variant_id);
-        if (info && info.productId !== -1) {
-            const details = info.variant_details ? ` (${info.variant_details})` : "";
-            return {
-                title: `${info.product_name}${details}`,
-                sku: info.sku || "-",
-            };
-        }
-    }
+//     // 2. Resolver function passed from hook
+//     if (getVariantDetailsFn) {
+//         const info = getVariantDetailsFn(row.variant_id);
+//         if (info && info.productId !== -1) {
+//             const details = info.variant_details ? ` (${info.variant_details})` : "";
+//             return {
+//                 title: `${info.product_name}${details}`,
+//                 sku: info.sku || "-",
+//             };
+//         }
+//     }
 
-    // 3. Variant map lookup
-    const info = variantMap?.get(row.variant_id);
-    if (info) {
-        const details = info.variant_details ? ` (${info.variant_details})` : "";
-        return {
-            title: `${info.product_name}${details}`,
-            sku: info.sku || "-",
-        };
-    }
+//     // 3. Variant map lookup
+//     const info = variantMap?.get(row.variant_id);
+//     if (info) {
+//         const details = info.variant_details ? ` (${info.variant_details})` : "";
+//         return {
+//             title: `${info.product_name}${details}`,
+//             sku: info.sku || "-",
+//         };
+//     }
 
-    // 4. Fallback
-    return {
-        title: `款式 #${row.variant_id}`,
-        sku: "-",
-    };
-};
+//     // 4. Fallback
+//     return {
+//         title: `款式 #${row.variant_id}`,
+//         sku: "-",
+//     };
+// };
 
-/**
- * Triggers a file download in the browser.
- */
-const downloadFile = (content: string, filename: string, mimeType: string) => {
-    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-};
+// /**
+//  * Triggers a file download in the browser.
+//  */
+// const downloadFile = (content: string, filename: string, mimeType: string) => {
+//     const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
+//     const url = URL.createObjectURL(blob);
+//     const link = document.createElement("a");
+//     link.href = url;
+//     link.download = filename;
+//     document.body.appendChild(link);
+//     link.click();
+//     document.body.removeChild(link);
+//     URL.revokeObjectURL(url);
+// };
 
-/**
- * Escapes strings for CSV formatting to handle commas, quotes, and newlines cleanly.
- */
-const escapeCSV = (val: string | number | null | undefined): string => {
-    if (val == null) return '""';
-    const str = String(val).replace(/"/g, '""');
-    return `"${str}"`;
-};
+// /**
+//  * Escapes strings for CSV formatting to handle commas, quotes, and newlines cleanly.
+//  */
+// const escapeCSV = (val: string | number | null | undefined): string => {
+//     if (val == null) return '""';
+//     const str = String(val).replace(/"/g, '""');
+//     return `"${str}"`;
+// };
 
-// ==========================================
-// 1. SALES ORDER CSV EXPORT
-// ==========================================
+// // ==========================================
+// // 1. SALES ORDER CSV EXPORT
+// // ==========================================
 
-export const exportSalesOrdersToCSV = (
-    orders: ExportSalesOrderData | ExportSalesOrderData[] | EnrichedSalesOrder | EnrichedSalesOrder[],
-    filenamePrefix = "sales_order",
-    getVariantDetailsFn?: (variantId: number) => ResolvedVariantInfo
-) => {
-    const orderList = Array.isArray(orders) ? orders : [orders];
+// export const exportSalesOrdersToCSV = (
+//     orders: ExportSalesOrderData | ExportSalesOrderData[] | EnrichedSalesOrder | EnrichedSalesOrder[],
+//     filenamePrefix = "sales_order",
+//     getVariantDetailsFn?: (variantId: number) => ResolvedVariantInfo
+// ) => {
+//     const orderList = Array.isArray(orders) ? orders : [orders];
 
-    const headers = [
-        "訂單編號",
-        "訂單狀態",
-        "客戶編號",
-        "客戶名稱",
-        "訂單建立日期",
-        "預計交貨日",
-        "商品款式名稱",
-        "SKU",
-        "數量",
-        "單價 ($)",
-        "小計 ($)",
-        "幣別",
-        "訂單總額 ($)",
-        "出貨倉庫編號",
-    ];
+//     const headers = [
+//         "訂單編號",
+//         "訂單狀態",
+//         "客戶編號",
+//         "客戶名稱",
+//         "訂單建立日期",
+//         "預計交貨日",
+//         "商品款式名稱",
+//         "SKU",
+//         "數量",
+//         "單價 ($)",
+//         "小計 ($)",
+//         "幣別",
+//         "訂單總額 ($)",
+//         "出貨倉庫編號",
+//     ];
 
-    const rows: string[][] = [];
+//     const rows: string[][] = [];
 
-    orderList.forEach((so) => {
-        const orderNo = so.order_no || `SO-${so.id}`;
-        const customerName = (so as ExportSalesOrderData).customer_name || `客戶 #${so.customer_id}`;
-        const variantMap = (so as ExportSalesOrderData).resolved_variant_map;
-        const itemRows = so.sales_order_rows || [];
-        const statusZh = formatOrderStatusZh(so.status);
+//     orderList.forEach((so) => {
+//         const orderNo = so.order_no || `SO-${so.id}`;
+//         const customerName = (so as ExportSalesOrderData).customer_name || `客戶 #${so.customer_id}`;
+//         const variantMap = (so as ExportSalesOrderData).resolved_variant_map;
+//         const itemRows = so.sales_order_rows || [];
+//         const statusZh = formatOrderStatusZh(so.status);
 
-        if (itemRows.length === 0) {
-            rows.push([
-                escapeCSV(orderNo),
-                escapeCSV(statusZh),
-                escapeCSV(so.customer_id),
-                escapeCSV(customerName),
-                escapeCSV(so.order_created_date ?? ""),
-                escapeCSV(so.delivery_date ?? ""),
-                escapeCSV("-"),
-                escapeCSV("-"),
-                escapeCSV(0),
-                escapeCSV(0),
-                escapeCSV(0),
-                escapeCSV(so.currency || "USD"),
-                escapeCSV(so.total ?? 0),
-                escapeCSV(so.location_id),
-            ]);
-        } else {
-            itemRows.forEach((row: KatanaSalesOrderRow | EnrichedSalesOrderRow) => {
-                const qty = row.quantity ?? 0;
-                const unitPrice = parseFloat(String(row.price_per_unit || "0"));
-                const lineTotal = row.total ?? qty * unitPrice;
-                const { title, sku } = getRowVariantMeta(row, variantMap, getVariantDetailsFn);
+//         if (itemRows.length === 0) {
+//             rows.push([
+//                 escapeCSV(orderNo),
+//                 escapeCSV(statusZh),
+//                 escapeCSV(so.customer_id),
+//                 escapeCSV(customerName),
+//                 escapeCSV(so.order_created_date ?? ""),
+//                 escapeCSV(so.delivery_date ?? ""),
+//                 escapeCSV("-"),
+//                 escapeCSV("-"),
+//                 escapeCSV(0),
+//                 escapeCSV(0),
+//                 escapeCSV(0),
+//                 escapeCSV(so.currency || "USD"),
+//                 escapeCSV(so.total ?? 0),
+//                 escapeCSV(so.location_id),
+//             ]);
+//         } else {
+//             itemRows.forEach((row: KatanaSalesOrderRow | EnrichedSalesOrderRow) => {
+//                 const qty = row.quantity ?? 0;
+//                 const unitPrice = parseFloat(String(row.price_per_unit || "0"));
+//                 const lineTotal = row.total ?? qty * unitPrice;
+//                 const { title, sku } = getRowVariantMeta(row, variantMap, getVariantDetailsFn);
 
-                rows.push([
-                    escapeCSV(orderNo),
-                    escapeCSV(statusZh),
-                    escapeCSV(so.customer_id),
-                    escapeCSV(customerName),
-                    escapeCSV(so.order_created_date ?? ""),
-                    escapeCSV(so.delivery_date ?? ""),
-                    escapeCSV(title),
-                    escapeCSV(sku),
-                    escapeCSV(qty),
-                    escapeCSV(unitPrice.toFixed(2)),
-                    escapeCSV(lineTotal.toFixed(2)),
-                    escapeCSV(so.currency || "USD"),
-                    escapeCSV(so.total ?? 0),
-                    escapeCSV(so.location_id),
-                ]);
-            });
-        }
-    });
+//                 rows.push([
+//                     escapeCSV(orderNo),
+//                     escapeCSV(statusZh),
+//                     escapeCSV(so.customer_id),
+//                     escapeCSV(customerName),
+//                     escapeCSV(so.order_created_date ?? ""),
+//                     escapeCSV(so.delivery_date ?? ""),
+//                     escapeCSV(title),
+//                     escapeCSV(sku),
+//                     escapeCSV(qty),
+//                     escapeCSV(unitPrice.toFixed(2)),
+//                     escapeCSV(lineTotal.toFixed(2)),
+//                     escapeCSV(so.currency || "USD"),
+//                     escapeCSV(so.total ?? 0),
+//                     escapeCSV(so.location_id),
+//                 ]);
+//             });
+//         }
+//     });
 
-    const csvContent =
-        "\uFEFF" +
-        [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+//     const csvContent =
+//         "\uFEFF" +
+//         [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
 
-    const dateStr = new Date().toISOString().split("T")[0];
-    const filename = `${filenamePrefix}_${dateStr}.csv`;
+//     const dateStr = new Date().toISOString().split("T")[0];
+//     const filename = `${filenamePrefix}_${dateStr}.csv`;
 
-    downloadFile(csvContent, filename, "text/csv");
-};
+//     downloadFile(csvContent, filename, "text/csv");
+// };
 
-// ==========================================
-// 2. SALES ORDER JSON EXPORT
-// ==========================================
+// // ==========================================
+// // 2. SALES ORDER JSON EXPORT
+// // ==========================================
 
-export const exportSalesOrdersToJSON = (
-    orders: ExportSalesOrderData | ExportSalesOrderData[] | EnrichedSalesOrder | EnrichedSalesOrder[],
-    filenamePrefix = "sales_order"
-) => {
-    const jsonString = JSON.stringify(orders, null, 2);
-    const dateStr = new Date().toISOString().split("T")[0];
-    const filename = `${filenamePrefix}_${dateStr}.json`;
+// export const exportSalesOrdersToJSON = (
+//     orders: ExportSalesOrderData | ExportSalesOrderData[] | EnrichedSalesOrder | EnrichedSalesOrder[],
+//     filenamePrefix = "sales_order"
+// ) => {
+//     const jsonString = JSON.stringify(orders, null, 2);
+//     const dateStr = new Date().toISOString().split("T")[0];
+//     const filename = `${filenamePrefix}_${dateStr}.json`;
 
-    downloadFile(jsonString, filename, "application/json");
-};
+//     downloadFile(jsonString, filename, "application/json");
+// };
 
-// ==========================================
-// 3. PRINT / SAVE AS PDF INVOICE
-// ==========================================
+// // ==========================================
+// // 3. PRINT / SAVE AS PDF INVOICE
+// // ==========================================
 
-/**
- * Fetches all Katana locations (matching the same list-then-filter pattern
- * used in loadLocations()) and returns the formatted address for the one
- * matching locationId. Returns null on any failure — missing ID, network
- * error, no matching location, or no address on it — so the caller can
- * fall back to the previously-passed-in locationName / a generic
- * "倉庫 #id" label instead of blocking or showing an error.
- *
- * Per Katana's API docs, a location's address object only has:
- * line_1, line_2, city, state, zip, country — no phone field.
- */
-const fetchLocationAddress = async (
-    locationId?: number
-): Promise<{ name?: string | null; formattedAddress: string | null } | null> => {
-    if (!locationId) return null;
+// /**
+//  * Fetches all Katana locations (matching the same list-then-filter pattern
+//  * used in loadLocations()) and returns the formatted address for the one
+//  * matching locationId. Returns null on any failure — missing ID, network
+//  * error, no matching location, or no address on it — so the caller can
+//  * fall back to the previously-passed-in locationName / a generic
+//  * "倉庫 #id" label instead of blocking or showing an error.
+//  *
+//  * Per Katana's API docs, a location's address object only has:
+//  * line_1, line_2, city, state, zip, country — no phone field.
+//  */
+// const fetchLocationAddress = async (
+//     locationId?: number
+// ): Promise<{ name?: string | null; formattedAddress: string | null } | null> => {
+//     if (!locationId) return null;
 
-    try {
-        const res = await katanaFetch<KatanaLocation[]>(KATANA_API_ROUTES.LOCATIONS);
-        if (!res.success || !Array.isArray(res.data)) return null;
+//     try {
+//         const res = await katanaFetch<KatanaLocation[]>(KATANA_API_ROUTES.LOCATIONS);
+//         if (!res.success || !Array.isArray(res.data)) return null;
 
-        const location = res.data.find((loc) => loc.id === locationId);
-        if (!location) return null;
+//         const location = res.data.find((loc) => loc.id === locationId);
+//         if (!location) return null;
 
-        const addr = location.address;
-        if (!addr) {
-            return { name: location.name || location.legal_name, formattedAddress: null };
-        }
+//         const addr = location.address;
+//         if (!addr) {
+//             return { name: location.name || location.legal_name, formattedAddress: null };
+//         }
 
-        const parts = [
-            addr.line_1,
-            addr.line_2,
-            [addr.city, addr.state, addr.zip].filter(Boolean).join(" ") || null,
-            addr.country,
-        ].filter(Boolean);
+//         const parts = [
+//             addr.line_1,
+//             addr.line_2,
+//             [addr.city, addr.state, addr.zip].filter(Boolean).join(" ") || null,
+//             addr.country,
+//         ].filter(Boolean);
 
-        return {
-            name: location.name || location.legal_name,
-            formattedAddress: parts.length > 0 ? parts.join("<br>") : null,
-        };
-    } catch (err) {
-        console.error("Failed to fetch location address from Katana:", err);
-        return null;
-    }
-};
+//         return {
+//             name: location.name || location.legal_name,
+//             formattedAddress: parts.length > 0 ? parts.join("<br>") : null,
+//         };
+//     } catch (err) {
+//         console.error("Failed to fetch location address from Katana:", err);
+//         return null;
+//     }
+// };
 
-export const printSalesOrderPDF = async (
-    order: ExportSalesOrderData | EnrichedSalesOrder,
-    locationName?: string,
-    getVariantDetailsFn?: (variantId: number) => ResolvedVariantInfo
-): Promise<void> => {
-    // 1. Open popup synchronously to prevent browser popup blockers
-    const printWindow = window.open("", "_blank", "width=900,height=1000");
-    if (!printWindow) {
-        console.error("Unable to open print window — blocked by browser.");
-        return;
-    }
+// export const printSalesOrderPDF = async (
+//     order: ExportSalesOrderData | EnrichedSalesOrder,
+//     locationName?: string,
+//     getVariantDetailsFn?: (variantId: number) => ResolvedVariantInfo
+// ): Promise<void> => {
+//     // 1. Open popup synchronously to prevent browser popup blockers
+//     const printWindow = window.open("", "_blank", "width=900,height=1000");
+//     if (!printWindow) {
+//         console.error("Unable to open print window — blocked by browser.");
+//         return;
+//     }
 
-    // Placeholder loading document
-    printWindow.document.open();
-    printWindow.document.write(
-        `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>` +
-            `<body style="font-family: -apple-system, sans-serif; padding: 40px; color:#6b7280;">正在準備列印內容...</body></html>`
-    );
-    printWindow.document.close();
+//     // Placeholder loading document
+//     printWindow.document.open();
+//     printWindow.document.write(
+//         `<!DOCTYPE html><html><head><meta charset="UTF-8"></head>` +
+//             `<body style="font-family: -apple-system, sans-serif; padding: 40px; color:#6b7280;">正在準備列印內容...</body></html>`
+//     );
+//     printWindow.document.close();
 
-    const title = order.order_no || `SO-${order.id}`;
-    const customerName = (order as ExportSalesOrderData).customer_name || `客戶 #${order.customer_id}`;
-    const variantMap = (order as ExportSalesOrderData).resolved_variant_map;
-    const itemRows = order.sales_order_rows || [];
-    const currencySymbol = order.currency || "$";
-    const statusZh = formatOrderStatusZh(order.status);
+//     const title = order.order_no || `SO-${order.id}`;
+//     const customerName = (order as ExportSalesOrderData).customer_name || `客戶 #${order.customer_id}`;
+//     const variantMap = (order as ExportSalesOrderData).resolved_variant_map;
+//     const itemRows = order.sales_order_rows || [];
+//     const currencySymbol = order.currency || "$";
+//     const statusZh = formatOrderStatusZh(order.status);
 
-    const shippingAddress = order.addresses?.find((a) => a.entity_type === "shipping");
-    const billingAddress = order.addresses?.find((a) => a.entity_type === "billing");
+//     const shippingAddress = order.addresses?.find((a) => a.entity_type === "shipping");
+//     const billingAddress = order.addresses?.find((a) => a.entity_type === "billing");
 
-    // Fetch warehouse location address in parallel
-    const locationAddressPromise = fetchLocationAddress(order.location_id);
+//     // Fetch warehouse location address in parallel
+//     const locationAddressPromise = fetchLocationAddress(order.location_id);
 
-    const formatAddress = (addr?: typeof shippingAddress) => {
-        if (!addr) return "-";
-        const parts = [
-            `${addr.first_name || ""} ${addr.last_name || ""}`.trim(),
-            addr.company,
-            addr.line_1,
-            addr.line_2,
-            `${addr.city}, ${addr.state} ${addr.zip}`,
-            addr.country,
-            addr.phone ? `電話: ${addr.phone}` : null,
-        ].filter(Boolean);
-        return parts.join("<br>");
-    };
+//     const formatAddress = (addr?: typeof shippingAddress) => {
+//         if (!addr) return "-";
+//         const parts = [
+//             `${addr.first_name || ""} ${addr.last_name || ""}`.trim(),
+//             addr.company,
+//             addr.line_1,
+//             addr.line_2,
+//             `${addr.city}, ${addr.state} ${addr.zip}`,
+//             addr.country,
+//             addr.phone ? `電話: ${addr.phone}` : null,
+//         ].filter(Boolean);
+//         return parts.join("<br>");
+//     };
 
-    const tableRowsHtml = itemRows
-        .map((row: KatanaSalesOrderRow | EnrichedSalesOrderRow, idx: number) => {
-            const { title: variantTitle, sku } = getRowVariantMeta(row, variantMap, getVariantDetailsFn);
-            const qty = row.quantity ?? 0;
-            const unitPrice = parseFloat(String(row.price_per_unit || "0"));
-            const lineTotal = row.total ?? qty * unitPrice;
+//     const tableRowsHtml = itemRows
+//         .map((row: KatanaSalesOrderRow | EnrichedSalesOrderRow, idx: number) => {
+//             const { title: variantTitle, sku } = getRowVariantMeta(row, variantMap, getVariantDetailsFn);
+//             const qty = row.quantity ?? 0;
+//             const unitPrice = parseFloat(String(row.price_per_unit || "0"));
+//             const lineTotal = row.total ?? qty * unitPrice;
 
-            return `
-            <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${idx + 1}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">
-                    <strong>${variantTitle}</strong><br>
-                    <span style="font-size: 11px; color: #6b7280;">SKU: ${sku}</span>
-                </td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${qty}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${currencySymbol}${unitPrice.toFixed(2)}</td>
-                <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${currencySymbol}${lineTotal.toFixed(2)}</td>
-            </tr>
-            `;
-        })
-        .join("");
+//             return `
+//             <tr>
+//                 <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${idx + 1}</td>
+//                 <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">
+//                     <strong>${variantTitle}</strong><br>
+//                     <span style="font-size: 11px; color: #6b7280;">SKU: ${sku}</span>
+//                 </td>
+//                 <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: center;">${qty}</td>
+//                 <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right;">${currencySymbol}${unitPrice.toFixed(2)}</td>
+//                 <td style="padding: 10px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600;">${currencySymbol}${lineTotal.toFixed(2)}</td>
+//             </tr>
+//             `;
+//         })
+//         .join("");
 
-    // 2. Await warehouse details
-    const locationResult = await locationAddressPromise;
-    const resolvedLocationName = locationResult?.name || locationName || `倉庫 #${order.location_id}`;
-    const locationAddressHtml = locationResult?.formattedAddress
-        ? `<div style="font-size: 12px; color: #6b7280; margin-top: 2px; line-height: 1.4;">${locationResult.formattedAddress}</div>`
-        : "";
+//     // 2. Await warehouse details
+//     const locationResult = await locationAddressPromise;
+//     const resolvedLocationName = locationResult?.name || locationName || `倉庫 #${order.location_id}`;
+//     const locationAddressHtml = locationResult?.formattedAddress
+//         ? `<div style="font-size: 12px; color: #6b7280; margin-top: 2px; line-height: 1.4;">${locationResult.formattedAddress}</div>`
+//         : "";
 
-    if (printWindow.closed) return;
+//     if (printWindow.closed) return;
 
-    // 3. Build actual document HTML
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html lang="zh-TW">
-    <head>
-        <meta charset="UTF-8">
-        <title>銷售訂單 - ${title}</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-        <style>
-            * {
-                box-sizing: border-box;
-            }
-            body {
-                font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", "微軟正黑體", sans-serif !important;
-                padding: 40px;
-                color: #111827;
-                -webkit-font-smoothing: antialiased;
-            }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 20px; margin-bottom: 24px; }
-            .title { font-size: 28px; font-weight: bold; margin: 0; }
-            .status { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; background-color: #f3f4f6; text-transform: uppercase; }
-            .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 24px; }
-            .address-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 32px; background: #f9fafb; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; }
-            .field-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-            .field-value { font-size: 14px; font-weight: 500; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
-            th { background-color: #f3f4f6; padding: 10px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #374151; border-bottom: 2px solid #e5e7eb; }
-            .total-section { display: flex; justify-content: flex-end; margin-top: 24px; }
-            .total-box { width: 260px; border-top: 2px solid #111827; padding-top: 12px; }
-            .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; padding: 6px 0; }
-            @media print {
-                body { padding: 0; }
-            }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <div>
-                <h1 class="title">銷售訂單 (Sales Order)</h1>
-                <p style="margin: 4px 0 0 0; color: #4b5563; font-size: 16px; font-weight: 600;"># ${title}</p>
-            </div>
-            <span class="status">${statusZh}</span>
-        </div>
+//     // 3. Build actual document HTML
+//     const htmlContent = `
+//     <!DOCTYPE html>
+//     <html lang="zh-TW">
+//     <head>
+//         <meta charset="UTF-8">
+//         <title>銷售訂單 - ${title}</title>
+//         <link rel="preconnect" href="https://fonts.googleapis.com">
+//         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+//         <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+//         <style>
+//             * {
+//                 box-sizing: border-box;
+//             }
+//             body {
+//                 font-family: "Noto Sans TC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang TC", "Microsoft JhengHei", "微軟正黑體", sans-serif !important;
+//                 padding: 40px;
+//                 color: #111827;
+//                 -webkit-font-smoothing: antialiased;
+//             }
+//             .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 20px; margin-bottom: 24px; }
+//             .title { font-size: 28px; font-weight: bold; margin: 0; }
+//             .status { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; background-color: #f3f4f6; text-transform: uppercase; }
+//             .meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 24px; }
+//             .address-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 32px; background: #f9fafb; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb; }
+//             .field-label { font-size: 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+//             .field-value { font-size: 14px; font-weight: 500; margin-top: 4px; }
+//             table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+//             th { background-color: #f3f4f6; padding: 10px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; color: #374151; border-bottom: 2px solid #e5e7eb; }
+//             .total-section { display: flex; justify-content: flex-end; margin-top: 24px; }
+//             .total-box { width: 260px; border-top: 2px solid #111827; padding-top: 12px; }
+//             .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; padding: 6px 0; }
+//             @media print {
+//                 body { padding: 0; }
+//             }
+//         </style>
+//     </head>
+//     <body>
+//         <div class="header">
+//             <div>
+//                 <h1 class="title">銷售訂單 (Sales Order)</h1>
+//                 <p style="margin: 4px 0 0 0; color: #4b5563; font-size: 16px; font-weight: 600;"># ${title}</p>
+//             </div>
+//             <span class="status">${statusZh}</span>
+//         </div>
 
-        <div class="meta-grid">
-            <div>
-                <div class="field-label">客戶名稱</div>
-                <div class="field-value">${customerName}</div>
-            </div>
-            <div>
-                <div class="field-label">出貨倉庫</div>
-                <div class="field-value">${resolvedLocationName}</div>
-                ${locationAddressHtml}
-            </div>
-            <div>
-                <div class="field-label">訂單建立日期</div>
-                <div class="field-value">${order.order_created_date ? new Date(order.order_created_date).toLocaleDateString("zh-TW") : "-"}</div>
-            </div>
-            <div>
-                <div class="field-label">預計交貨日</div>
-                <div class="field-value">${order.delivery_date ? new Date(order.delivery_date).toLocaleDateString("zh-TW") : "-"}</div>
-            </div>
-        </div>
+//         <div class="meta-grid">
+//             <div>
+//                 <div class="field-label">客戶名稱</div>
+//                 <div class="field-value">${customerName}</div>
+//             </div>
+//             <div>
+//                 <div class="field-label">出貨倉庫</div>
+//                 <div class="field-value">${resolvedLocationName}</div>
+//                 ${locationAddressHtml}
+//             </div>
+//             <div>
+//                 <div class="field-label">訂單建立日期</div>
+//                 <div class="field-value">${order.order_created_date ? new Date(order.order_created_date).toLocaleDateString("zh-TW") : "-"}</div>
+//             </div>
+//             <div>
+//                 <div class="field-label">預計交貨日</div>
+//                 <div class="field-value">${order.delivery_date ? new Date(order.delivery_date).toLocaleDateString("zh-TW") : "-"}</div>
+//             </div>
+//         </div>
 
-        ${order.addresses && order.addresses.length > 0
-            ? `
-        <div class="address-grid">
-            <div>
-                <div class="field-label" style="margin-bottom: 6px;">帳單地址</div>
-                <div style="font-size: 13px; line-height: 1.5;">${formatAddress(billingAddress)}</div>
-            </div>
-            <div>
-                <div class="field-label" style="margin-bottom: 6px;">送貨地址</div>
-                <div style="font-size: 13px; line-height: 1.5;">${formatAddress(shippingAddress)}</div>
-            </div>
-        </div>
-        `
-            : ""
-        }
+//         ${order.addresses && order.addresses.length > 0
+//             ? `
+//         <div class="address-grid">
+//             <div>
+//                 <div class="field-label" style="margin-bottom: 6px;">帳單地址</div>
+//                 <div style="font-size: 13px; line-height: 1.5;">${formatAddress(billingAddress)}</div>
+//             </div>
+//             <div>
+//                 <div class="field-label" style="margin-bottom: 6px;">送貨地址</div>
+//                 <div style="font-size: 13px; line-height: 1.5;">${formatAddress(shippingAddress)}</div>
+//             </div>
+//         </div>
+//         `
+//             : ""
+//         }
 
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 40px;">#</th>
-                    <th>商品名稱 / 規格</th>
-                    <th style="text-align: center; width: 80px;">數量</th>
-                    <th style="text-align: right; width: 100px;">單價</th>
-                    <th style="text-align: right; width: 120px;">小計</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${tableRowsHtml}
-            </tbody>
-        </table>
+//         <table>
+//             <thead>
+//                 <tr>
+//                     <th style="width: 40px;">#</th>
+//                     <th>商品名稱 / 規格</th>
+//                     <th style="text-align: center; width: 80px;">數量</th>
+//                     <th style="text-align: right; width: 100px;">單價</th>
+//                     <th style="text-align: right; width: 120px;">小計</th>
+//                 </tr>
+//             </thead>
+//             <tbody>
+//                 ${tableRowsHtml}
+//             </tbody>
+//         </table>
 
-        <div class="total-section">
-            <div class="total-box">
-                <div class="total-row">
-                    <span>總計金額:</span>
-                    <span>${currencySymbol}${(order.total ?? 0).toFixed(2)}</span>
-                </div>
-            </div>
-        </div>
+//         <div class="total-section">
+//             <div class="total-box">
+//                 <div class="total-row">
+//                     <span>總計金額:</span>
+//                     <span>${currencySymbol}${(order.total ?? 0).toFixed(2)}</span>
+//                 </div>
+//             </div>
+//         </div>
 
-        ${order.additional_info
-            ? `
-        <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
-            <div class="field-label">備註事項</div>
-            <div style="font-size: 13px; margin-top: 6px; color: #374151; white-space: pre-wrap;">${order.additional_info}</div>
-        </div>
-        `
-            : ""
-        }
-    </body>
-    </html>
-    `;
+//         ${order.additional_info
+//             ? `
+//         <div style="margin-top: 32px; border-top: 1px solid #e5e7eb; padding-top: 16px;">
+//             <div class="field-label">備註事項</div>
+//             <div style="font-size: 13px; margin-top: 6px; color: #374151; white-space: pre-wrap;">${order.additional_info}</div>
+//         </div>
+//         `
+//             : ""
+//         }
+//     </body>
+//     </html>
+//     `;
 
-    // 4. Write full document content
-    const doc = printWindow.document;
-    doc.open();
-    doc.write(htmlContent);
-    doc.close();
+//     // 4. Write full document content
+//     const doc = printWindow.document;
+//     doc.open();
+//     doc.write(htmlContent);
+//     doc.close();
 
-    const triggerPrint = () => {
-        if (printWindow.closed) return;
-        printWindow.focus();
-        printWindow.print();
-    };
+//     const triggerPrint = () => {
+//         if (printWindow.closed) return;
+//         printWindow.focus();
+//         printWindow.print();
+//     };
 
-    printWindow.addEventListener("afterprint", () => {
-        printWindow.close();
-    });
+//     printWindow.addEventListener("afterprint", () => {
+//         printWindow.close();
+//     });
 
-    // 5. Trigger print ONLY after writing the real content document
-    const executePrint = async () => {
-        try {
-            const winFonts = doc.fonts as FontFaceSet | undefined;
-            if (winFonts) {
-                await winFonts.load('400 14px "Noto Sans TC"').catch(() => undefined);
-                await winFonts.ready;
-            }
-        } catch {
-            // Ignore error and fall back to system fonts
-        }
-        triggerPrint();
-    };
+//     // 5. Trigger print ONLY after writing the real content document
+//     const executePrint = async () => {
+//         try {
+//             const winFonts = doc.fonts as FontFaceSet | undefined;
+//             if (winFonts) {
+//                 await winFonts.load('400 14px "Noto Sans TC"').catch(() => undefined);
+//                 await winFonts.ready;
+//             }
+//         } catch {
+//             // Ignore error and fall back to system fonts
+//         }
+//         triggerPrint();
+//     };
 
-    // Delay slightly to give Chrome time to parse DOM elements and CSS rules
-    setTimeout(executePrint, 250);
-};
+//     // Delay slightly to give Chrome time to parse DOM elements and CSS rules
+//     setTimeout(executePrint, 250);
+// };
