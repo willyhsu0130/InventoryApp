@@ -1,44 +1,65 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AuthContext } from "@/context/auth/AuthContext";
 import type { AuthContextType } from "@/models/authContexType";
-
-const STORAGE_KEY = 'auth_token';
-const USERNAME_STORAGE_KEY = 'auth_username';
+import { supabase } from "@/lib/supabase";
+import type { Session, User } from "@supabase/supabase-js";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem(STORAGE_KEY);
-  });
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const [username, setUsername] = useState<string>(() => {
-    return localStorage.getItem(USERNAME_STORAGE_KEY) ?? "";
-  });
+  useEffect(() => {
+    // 1. Fetch initial session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      setIsLoading(false);
+    });
 
+    // 2. Subscribe to auth state updates (sign-in, sign-out, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      setIsLoading(false);
+    });
 
-  const loginToken = (t: string, uname: string) => {
-    setToken(t);
-    setUsername(uname);
-    localStorage.setItem(STORAGE_KEY, t);
-    localStorage.setItem(USERNAME_STORAGE_KEY, uname);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const loginToken = async (email: string, pass: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: pass,
+    });
+    if (error) throw error;
   };
 
-  const logoutToken = () => {
-    setToken(null);
-    setUsername('');
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(USERNAME_STORAGE_KEY);
+  const logoutToken = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
-  const checkAuth = () => !!token;
+  const token = session?.access_token ?? null;
+  const username = user?.user_metadata?.username ?? user?.email ?? "";
 
   const contextValue: AuthContextType = {
     username,
     token,
     loginToken,
     logoutToken,
-    isAuthenticated: !!token,
-    checkAuth,
+    isAuthenticated: Boolean(session),
+    checkAuth: () => Boolean(session),
   };
+
+  // Optional: Prevent flash of unauthenticated layout during initial token read
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <AuthContext.Provider value={contextValue}>

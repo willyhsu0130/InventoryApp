@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useContext } from "react"
+import { useNavigate } from "react-router-dom"
 import { cn } from "@/lib/utils"
-import { BACKEND_URL } from "@/lib/katanaFetch"
+import { AuthContext } from "@/context/auth/AuthContext"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -20,51 +21,30 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const auth = useContext(AuthContext)
+  const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSubmitting(true)
+    setErrorMessage(null)
 
     try {
-      const authUrl = `${BACKEND_URL.replace(/\/+$|\/$/, '')}/auth/login`;
-      const resp = await fetch(authUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await resp.json();
-
-      if (!resp.ok) {
-        // TODO: show user-friendly error
-        alert(data.error || 'Login failed');
-        return;
+      if (!auth) {
+        throw new Error("認證模組尚未載入，請稍後再試。")
       }
 
-      // If AuthContext is available, use it
-      // Lazy import to avoid circular issues
-      try {
-        // Using window.dispatchEvent to notify provider is not ideal, so prefer context if available
-      } catch (err) {
-        console.log(err)
-        // ignore
-      }
-
-      // If backend returns token, store in localStorage and navigate
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
-        // Optionally store username
-        localStorage.setItem('auth_username', data.user?.username || username);
-        // Navigate to home
-        window.location.href = '/';
-      } else {
-        // No token returned — still navigate or show message
-        window.location.href = '/';
-      }
+      await auth.loginToken(email, password)
+      navigate("/")
     } catch (err) {
-      console.error('Login error', err);
-      alert('Login failed');
+      setErrorMessage(err instanceof Error ? err.message : "登入失敗，請確認帳號密碼。")
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -74,20 +54,27 @@ export function LoginForm({
         <CardHeader>
           <CardTitle>帳號登入</CardTitle>
           <CardDescription>
-            請輸入您的使用者名稱與密碼以登入系統
+            請輸入您的電子信箱與密碼以登入系統
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {errorMessage && (
+            <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              {errorMessage}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="username">使用者名稱</FieldLabel>
+                <FieldLabel htmlFor="email">電子信箱 / 使用者名稱</FieldLabel>
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder="請輸入使用者名稱"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
                   required
                 />
               </Field>
@@ -107,12 +94,13 @@ export function LoginForm({
                   placeholder="請輸入密碼"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={isSubmitting}
                   required
                 />
               </Field>
               <Field className="flex flex-col gap-2 mt-2">
-                <Button type="submit" className="w-full">
-                  登入
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "登入中..." : "登入"}
                 </Button>
               </Field>
             </FieldGroup>
