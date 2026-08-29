@@ -23,8 +23,9 @@
     "dev": "concurrently -n \"FE,BE\" -c \"cyan,green\" \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "dev:frontend": "npm run dev -w frontend",
     "dev:backend": "npm run dev -w backend",
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "build:shared": "npm run build --workspace=@my-inventory-app/shared",
+    "build:frontend": "npm run build:shared && npm run build --workspace=@my-inventory-app/frontend",
+    "build:backend": "npm run build:shared && npm run build --workspace=@my-inventory-app/backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "update-types": "dotenv -e .env supabase gen types typescript --project-id \"lrffpvcrxqrwomsgnxja\" --schema public > packages/shared/src/models/database.types.ts"
   },
